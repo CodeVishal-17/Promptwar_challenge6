@@ -54,6 +54,22 @@ describe('cited constants', () => {
     expect(0.02635 / 0.12943).toBeCloseTo(EV_KWH_PER_KM, 4);
     expect(RAIL_KWH_PER_PKM).toBeCloseTo(0.01522 / 0.12943, 10);
   });
+
+  it('states the rail derivation in the user-facing assumptions', () => {
+    const text = commuteCo2('rail', 10, 'IN').assumptions.join(' ');
+    expect(text).toMatch(/London Underground.*÷/);
+    expect(text).toMatch(
+      /0\.01522 kg CO₂ per passenger-km ÷ .*0\.12943 kg CO₂ per kWh = 0\.1176 kWh/,
+    );
+    expect(commuteCo2('car_ev', 10, 'IN').assumptions.join(' ')).not.toMatch(/Derived/);
+  });
+
+  it('keeps electric-mode descriptions free of nested parentheses', () => {
+    for (const mode of ['rail', 'car_ev'] as const) {
+      const first = commuteCo2(mode, 10, 'IN').assumptions[1]!;
+      expect(first).not.toMatch(/\([^)]*\(/);
+    }
+  });
 });
 
 describe('gridIntensity.json', () => {

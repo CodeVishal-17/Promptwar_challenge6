@@ -55,9 +55,14 @@ export const EV_KWH_PER_KM = 0.20358;
  * ÷ 'UK electricity'!F25 (Electricity generated 2026, kg CO₂ per kWh, 0.12943).
  * The same division reproduces the BEV SECR factor above (0.02635 ÷ 0.12943 = 0.20358).
  */
-export const RAIL_KWH_PER_PKM = 0.01522 / 0.12943;
+const LONDON_UNDERGROUND_KG_CO2_PER_PKM = 0.01522;
+const UK_GRID_KG_CO2_PER_KWH = 0.12943;
+export const RAIL_KWH_PER_PKM = LONDON_UNDERGROUND_KG_CO2_PER_PKM / UK_GRID_KG_CO2_PER_KWH;
 
-const ELECTRIC_KWH: Record<ElectricMode, { kwhPerKm: number; per: string; description: string }> = {
+const ELECTRIC_KWH: Record<
+  ElectricMode,
+  { kwhPerKm: number; per: string; description: string; derivation?: string }
+> = {
   car_ev: {
     kwhPerKm: EV_KWH_PER_KM,
     per: 'vehicle-km',
@@ -66,7 +71,8 @@ const ELECTRIC_KWH: Record<ElectricMode, { kwhPerKm: number; per: string; descri
   rail: {
     kwhPerKm: RAIL_KWH_PER_PKM,
     per: 'passenger-km',
-    description: 'electric metro rail (London Underground basis)',
+    description: 'electric metro rail, London Underground basis',
+    derivation: `Derived: DESNZ 2026 London Underground ${LONDON_UNDERGROUND_KG_CO2_PER_PKM} kg CO₂ per passenger-km ÷ DESNZ 2026 UK electricity ${UK_GRID_KG_CO2_PER_KWH} kg CO₂ per kWh = ${formatNumber(RAIL_KWH_PER_PKM, 4)} kWh per passenger-km (the method DESNZ uses for its kWh-per-km factors).`,
   },
 };
 
@@ -147,7 +153,8 @@ function modeFactor(mode: CommuteMode, countryCode?: string): ModeFactor {
       kgPerKm,
       basis: `${formatNumber(e.kwhPerKm, 5)} kWh per ${e.per} × ${formatNumber(g.gPerKwh, 0)} g CO₂e/kWh`,
       assumptions: [
-        `${cap(MODE_LABEL[mode])}: ${formatNumber(e.kwhPerKm, 5)} kWh per ${e.per} (${e.description}, DESNZ 2026) on ${where}.`,
+        `${cap(MODE_LABEL[mode])}: ${formatNumber(e.kwhPerKm, 5)} kWh per ${e.per}, ${e.description}, DESNZ 2026, on ${where}.`,
+        ...(e.derivation ? [e.derivation] : []),
         'Grid intensity is lifecycle emissions per kWh generated; losses in the wires between power station and plug are not included.',
       ],
       sources: [DESNZ_2026, GRID_INTENSITY_SOURCE],
