@@ -18,7 +18,8 @@ export interface AppDeps {
   limits?: Limits;
   /** Built frontend; when absent only the API is served. */
   staticDir?: string;
-  trustProxy?: boolean;
+  /** Reverse-proxy hops in front of the app (0 = none); the rate limiter keys on the client IP they reveal. */
+  trustProxy?: number;
 }
 
 const BODY_LIMIT = '10kb';
@@ -55,7 +56,7 @@ export function createApp(deps: AppDeps): Express {
   const app = express();
 
   app.disable('x-powered-by');
-  app.set('trust proxy', deps.trustProxy ?? false);
+  app.set('trust proxy', deps.trustProxy ?? 0);
 
   app.use(securityHeaders());
   app.use(compression());

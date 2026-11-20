@@ -10,7 +10,7 @@ export interface Limits {
   windowMs: number;
 }
 
-export const DEFAULT_LIMITS: Limits = { heavyMax: 20, lightMax: 120, windowMs: 60_000 };
+export const DEFAULT_LIMITS: Limits = { heavyMax: 20, lightMax: 120, windowMs: 10 * 60_000 };
 
 /** Exactly the policy the frontend is built for: same-origin only, no inline script or style. */
 export const securityHeaders = (): RequestHandler =>

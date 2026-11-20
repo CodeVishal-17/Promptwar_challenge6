@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_PROFILE } from '../../shared/profile.js';
 import type { AirReport } from '../../shared/types.js';
 import { createApp } from '../../server/src/app.js';
+import { DEFAULT_LIMITS } from '../../server/src/middleware/security.js';
 import type { GeminiClient } from '../../server/src/services/gemini.js';
 import { UpstreamError } from '../../server/src/services/openMeteo.js';
 import { makeReport } from './domain/fixtures.js';
@@ -188,6 +189,22 @@ describe('validation', () => {
 });
 
 describe('rate limits', () => {
+  it('defaults to 20 heavy and 120 light requests per 10 minutes', () => {
+    expect(DEFAULT_LIMITS).toEqual({ heavyMax: 20, lightMax: 120, windowMs: 600_000 });
+  });
+
+  it('ignores X-Forwarded-For unless proxy hops are trusted', async () => {
+    const limits = { heavyMax: 1, lightMax: 100, windowMs: 60_000 };
+    const spoof = (app: ReturnType<typeof build>, ip: string) =>
+      request(app).post('/api/plan').set('X-Forwarded-For', ip).send(planBody);
+    const direct = build({ limits });
+    expect((await spoof(direct, '1.1.1.1')).status).toBe(200);
+    expect((await spoof(direct, '2.2.2.2')).status).toBe(429);
+    const proxied = build({ limits, trustProxy: 1 });
+    expect((await spoof(proxied, '1.1.1.1')).status).toBe(200);
+    expect((await spoof(proxied, '2.2.2.2')).status).toBe(200);
+  });
+
   it('returns 429 on the 21st plan request', async () => {
     const app = build({ limits: { heavyMax: 20, lightMax: 100, windowMs: 60_000 } });
     for (let i = 0; i < 20; i++) {

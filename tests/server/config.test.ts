@@ -7,7 +7,7 @@ describe('loadConfig', () => {
       port: 8080,
       geminiApiKey: null,
       geminiModel: 'gemini-2.5-flash',
-      trustProxy: false,
+      trustProxy: 0,
     });
   });
 
@@ -19,11 +19,24 @@ describe('loadConfig', () => {
   it('reads the environment', () => {
     expect(
       loadConfig({ PORT: '3000', GEMINI_API_KEY: ' k ', GEMINI_MODEL: 'm', TRUST_PROXY: 'true' }),
-    ).toEqual({ port: 3000, geminiApiKey: 'k', geminiModel: 'm', trustProxy: true });
+    ).toEqual({ port: 3000, geminiApiKey: 'k', geminiModel: 'm', trustProxy: 1 });
   });
 
   it('falls back to the default port when PORT is invalid', () => {
     expect(loadConfig({ PORT: 'abc' }).port).toBe(8080);
     expect(loadConfig({ PORT: '99999' }).port).toBe(8080);
+  });
+
+  it.each([
+    [undefined, 0],
+    ['', 0],
+    ['false', 0],
+    ['true', 1],
+    ['2', 2],
+    ['abc', 0],
+    ['-1', 0],
+    ['1.5', 0],
+  ])('parses TRUST_PROXY %j as %j hops', (raw, hops) => {
+    expect(loadConfig(raw === undefined ? {} : { TRUST_PROXY: raw }).trustProxy).toBe(hops);
   });
 });
