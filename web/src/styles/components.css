@@ -685,13 +685,28 @@
 }
 
 .chart-wrap {
-  margin-inline: calc(var(--space-2) * -1);
+  --plot-h: 11rem;
+  --pad-top: 1.75rem;
+  --pad-left: 2rem;
+  position: relative;
+  padding: var(--pad-top) 0 3rem var(--pad-left);
 }
 
+.chart-wrap--stacked {
+  --pad-top: 3.25rem;
+}
+
+@media (min-width: 40rem) {
+  .chart-wrap {
+    --plot-h: 14rem;
+  }
+}
+
+/* Bars, bands and lines only: stretched to the box, so no text lives inside it. */
 .chart {
   display: block;
   width: 100%;
-  height: auto;
+  height: var(--plot-h);
 }
 
 .chart__bar {
@@ -707,35 +722,117 @@
   fill: var(--color-sunken);
   stroke: var(--color-border-strong);
   stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 
 .chart__window--worst {
   stroke-dasharray: 4 3;
 }
 
+/* A bar along the top of each window, tying its text label to the hours it covers. */
+.chart__bracket {
+  stroke: var(--color-text);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart__bracket--worst {
+  stroke-dasharray: 5 3;
+}
+
+.outlook-block {
+  margin-top: var(--space-5);
+}
+
 .chart__grid,
-.chart__tick,
+.chart__vgrid,
 .chart__baseline {
   stroke: var(--color-border);
   stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 
-.chart__baseline,
-.chart__tick {
+.chart__baseline {
   stroke: var(--color-border-strong);
+}
+
+/* Chart text is HTML, placed by percentage, at a size that stays readable on a phone. */
+.chart__y,
+.chart__x,
+.chart__marks {
+  position: absolute;
+  pointer-events: none;
+}
+
+.chart__y {
+  top: var(--pad-top);
+  left: 0;
+  width: calc(var(--pad-left) - var(--space-2));
+  height: var(--plot-h);
+}
+
+.chart__x {
+  top: calc(var(--pad-top) + var(--plot-h) + var(--space-2));
+  right: 0;
+  left: var(--pad-left);
+}
+
+.chart__marks {
+  top: var(--space-1);
+  right: 0;
+  left: var(--pad-left);
 }
 
 .chart__axis-label,
 .chart__tick-label,
 .chart__window-label {
-  fill: var(--color-text-muted);
-  font-family: var(--font-sans);
-  font-size: 11px;
+  position: absolute;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.chart__axis-label {
+  right: 0;
+  transform: translateY(50%);
+}
+
+.chart__tick-label {
+  top: 0;
+  text-align: center;
+}
+
+.chart__tick-day {
+  display: block;
+  font-weight: var(--weight-semibold);
 }
 
 .chart__window-label {
-  fill: var(--color-text);
+  top: 0;
+  color: var(--color-text);
   font-weight: var(--weight-semibold);
+}
+
+.chart__window-label--low {
+  top: 1.45rem;
+}
+
+[data-anchor='middle'] {
+  transform: translateX(-50%);
+}
+
+[data-anchor='end'] {
+  transform: translateX(-100%);
+  text-align: right;
+}
+
+@media (max-width: 40rem) {
+  /* Six-hourly labels would touch on a phone; keep every twelfth hour. */
+  .chart__tick-label--minor {
+    display: none;
+  }
 }
 
 .forecast__windows {

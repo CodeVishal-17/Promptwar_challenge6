@@ -12,8 +12,8 @@ function nth<T>(list: ArrayLike<T>, i: number): T {
 
 const START = Date.UTC(2026, 10, 20, 14); // Fri 20 Nov 2026 14:00, read as wall-clock
 
-function wall(i: number): string {
-  return new Date(START + i * 3_600_000).toISOString().slice(0, 16);
+function wall(i: number, start = START): string {
+  return new Date(start + i * 3_600_000).toISOString().slice(0, 16);
 }
 
 function hourly(count = 48, nullAt: number[] = []): (AqiReading | null)[] {
@@ -101,24 +101,75 @@ describe('renderForecast', () => {
     expect(svg?.hasAttribute('style')).toBe(false);
   });
 
-  it('draws 48 bars coloured through data-category, with a visible tick every 6 hours', () => {
+  it('draws 48 bars coloured through data-category, with a tick label every 6 hours', () => {
     renderForecast(el, report());
     const bars = el.querySelectorAll('svg rect.chart__bar');
     expect(bars).toHaveLength(48);
     expect(nth(bars, 0).getAttribute('data-category')).toBe('good');
-    expect(el.querySelectorAll('svg .chart__tick-label').length).toBeGreaterThanOrEqual(8);
+    const labels = [...el.querySelectorAll('.chart__tick-label')].map((n) => n.textContent);
+    expect(labels).toHaveLength(8);
+    expect(labels[0]).toContain('18:00');
+    expect(labels.join(' ')).toContain('Sat');
+  });
+
+  it('keeps every piece of chart text out of the scaled SVG, as aria-hidden HTML', () => {
+    renderForecast(el, report());
+    expect(el.querySelector('svg text')).toBeNull();
+    for (const sel of ['.chart__axis-label', '.chart__tick-label', '.chart__window-label']) {
+      const nodes = el.querySelectorAll(sel);
+      expect(nodes.length).toBeGreaterThan(0);
+      for (const n of nodes) {
+        expect(n.closest('svg')).toBeNull();
+        expect(n.closest('[aria-hidden="true"]')).not.toBeNull();
+      }
+    }
+  });
+
+  it('keeps every tick label inside the chart whatever the start hour', () => {
+    for (let startHour = 0; startHour < 24; startHour++) {
+      const start = Date.UTC(2026, 10, 20, startHour);
+      const [first] = hourly(1);
+      const hours = Array.from({ length: 48 }, (_, i) => ({
+        ...(first as AqiReading),
+        time: wall(i, start),
+      }));
+      renderForecast(el, report({ hourly: hours, windows: [] }));
+      const labels = [...el.querySelectorAll<HTMLElement>('.chart__tick-label')];
+      expect(labels.length).toBeGreaterThanOrEqual(8);
+      for (const label of labels) {
+        const left = parseFloat(label.style.left);
+        expect(left, `start ${startHour}`).toBeGreaterThanOrEqual(0);
+        expect(left, `start ${startHour}`).toBeLessThanOrEqual(100);
+        const anchor = left > 88 ? 'end' : left < 12 ? 'start' : 'middle';
+        expect(label.getAttribute('data-anchor'), `start ${startHour} at ${left}%`).toBe(anchor);
+      }
+    }
   });
 
   it('marks the best and worst windows with text, not colour alone', () => {
     renderForecast(el, report());
-    const svgText = el.querySelector('svg')?.textContent ?? '';
-    expect(svgText).toContain('Cleanest');
-    expect(svgText).toContain('Worst');
+    const labels = [...el.querySelectorAll('.chart__window-label')].map((n) => n.textContent);
+    expect(labels).toEqual(['Cleanest', 'Worst']);
     const summary = el.querySelector('.forecast__windows')?.textContent ?? '';
     expect(summary).toContain('Cleanest air');
     expect(summary).toContain('16:00–18:00');
     expect(summary).toContain('Worst');
     expect(summary).toContain('20:00–22:00');
+  });
+
+  it('puts window labels at the window centre, stacking them when they would collide', () => {
+    renderForecast(el, report());
+    expect(el.querySelector('.chart-wrap--stacked')).toBeNull();
+    renderForecast(
+      el,
+      report({
+        windows: [
+          { kind: 'best', start: wall(2), end: wall(4), meanAqi: 27 },
+          { kind: 'worst', start: wall(6), end: wall(8), meanAqi: 90 },
+        ],
+      }),
+    );
+    expect(el.querySelector('.chart-wrap--stacked')).not.toBeNull();
   });
 
   it('omits window wording that has no data behind it', () => {

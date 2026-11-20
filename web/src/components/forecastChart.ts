@@ -94,15 +94,17 @@ function svg<K extends keyof SVGElementTagNameMap>(
   return el;
 }
 
-// Layout in viewBox units; the SVG scales to its container, so these are proportions, not pixels.
-const VIEW_W = 720;
-const VIEW_H = 250;
-const PAD = { top: 22, right: 6, bottom: 28, left: 34 };
-const PLOT_W = VIEW_W - PAD.left - PAD.right;
-const PLOT_H = VIEW_H - PAD.top - PAD.bottom;
+// The SVG draws only bars, bands and lines, stretched to its box (preserveAspectRatio none), so it
+// carries no text: every label is HTML, positioned by percentage, and stays at a readable size.
+const PLOT_W = 480;
+const PLOT_H = 100;
 const GRID_LINES = [50, 100, 150, 200];
-const GAP_MARK_H = 3;
+const GAP_MARK_H = 2.5;
 const TICK_EVERY_H = 6;
+/** Labels centred closer than this to an edge (percent of the plot width) anchor to that edge. */
+const EDGE_ZONE = 12;
+/** Window labels centred closer than this (percent) would overlap, so the second goes on a new row. */
+const LABEL_CLASH = 22;
 
 const hhmm = (time: string): string => formatLocalTime(time);
 const hourOf = (time: string): number => Number(time.slice(11, 13));
@@ -128,65 +130,85 @@ function describe(report: AirReport): string {
   return parts.length > 0 ? `${head} ${parts.join(', ')}.` : head;
 }
 
-function windowBands(report: AirReport, times: string[], slot: number): SVGElement[] {
-  const out: SVGElement[] = [];
+/** An HTML label at `pct` % of the plot width, anchored to the edge it is near so it never clips. */
+function placed(
+  className: string,
+  pct: number,
+  text: string,
+  ...extra: (Node | string)[]
+): HTMLElement {
+  const anchor = pct > 100 - EDGE_ZONE ? 'end' : pct < EDGE_ZONE ? 'start' : 'middle';
+  const el = h('span', { class: className, 'data-anchor': anchor }, text, ...extra);
+  el.style.left = `${Math.round(pct * 100) / 100}%`;
+  return el;
+}
+
+interface Placed {
+  bands: SVGElement[];
+  labels: HTMLElement[];
+  stacked: boolean;
+}
+
+function windowMarks(report: AirReport, times: string[], slot: number): Placed {
+  const out: Placed = { bands: [], labels: [], stacked: false };
+  const centres: number[] = [];
   for (const w of report.windows) {
     const first = times.indexOf(w.start);
     if (first < 0) continue;
     const found = times.indexOf(w.end);
     const last = found < 0 ? times.length : found;
     if (last <= first) continue;
-    const x = PAD.left + first * slot;
-    const bandW = (last - first) * slot;
-    out.push(
+    out.bands.push(
       svg('rect', {
         class: `chart__window chart__window--${w.kind}`,
-        x,
-        y: PAD.top,
-        width: bandW,
+        x: first * slot,
+        y: 0,
+        width: (last - first) * slot,
         height: PLOT_H,
       }),
     );
-    // Keep the label inside the plot: anchor to whichever end is nearer an edge.
-    const centre = x + bandW / 2;
-    const anchor =
-      centre < PAD.left + 70 ? 'start' : centre > VIEW_W - PAD.right - 70 ? 'end' : 'middle';
-    const labelX = anchor === 'start' ? x : anchor === 'end' ? x + bandW : centre;
-    out.push(
-      svg(
-        'text',
-        {
-          class: `chart__window-label chart__window-label--${w.kind}`,
-          x: labelX,
-          y: PAD.top - 7,
-          'text-anchor': anchor,
-        },
-        w.kind === 'best' ? 'Cleanest' : 'Worst',
-      ),
+    out.bands.push(
+      svg('line', {
+        class: `chart__bracket chart__bracket--${w.kind}`,
+        x1: first * slot,
+        x2: last * slot,
+        y1: 1.5,
+        y2: 1.5,
+      }),
     );
+    const pct = (((first + last) / 2) * slot * 100) / PLOT_W;
+    const label = placed(
+      `chart__window-label chart__window-label--${w.kind}`,
+      pct,
+      w.kind === 'best' ? 'Cleanest' : 'Worst',
+    );
+    if (centres.some((c) => Math.abs(c - pct) < LABEL_CLASH)) {
+      label.classList.add('chart__window-label--low');
+      out.stacked = true;
+    }
+    centres.push(pct);
+    out.labels.push(label);
   }
   return out;
 }
 
-function buildChart(report: AirReport): SVGSVGElement {
+function buildChart(report: AirReport): HTMLElement {
   const { hourly } = report;
   const times = hourTimes(hourly);
   const highest = Math.max(0, ...hourly.map((r) => r?.aqi ?? 0));
   const top = Math.max(MIN_SCALE_TOP, highest);
   const bars = chartBars(hourly, PLOT_W, PLOT_H, top);
   const slot = PLOT_W / hourly.length;
-  const baseline = PAD.top + PLOT_H;
 
-  const grid = GRID_LINES.filter((v) => v <= top).flatMap((v) => {
-    const y = baseline - (v / top) * PLOT_H;
-    return [
-      svg('line', { class: 'chart__grid', x1: PAD.left, x2: VIEW_W - PAD.right, y1: y, y2: y }),
-      svg(
-        'text',
-        { class: 'chart__axis-label', x: PAD.left - 6, y: y + 4, 'text-anchor': 'end' },
-        String(v),
-      ),
-    ];
+  const gridValues = GRID_LINES.filter((v) => v <= top);
+  const grid = gridValues.map((v) => {
+    const y = PLOT_H - (v / top) * PLOT_H;
+    return svg('line', { class: 'chart__grid', x1: 0, x2: PLOT_W, y1: y, y2: y });
+  });
+  const yLabels = gridValues.map((v) => {
+    const el = h('span', { class: 'chart__axis-label' }, String(v));
+    el.style.bottom = `${Math.round((v / top) * 10000) / 100}%`;
+    return el;
   });
 
   const barEls = bars.map((b) =>
@@ -194,62 +216,65 @@ function buildChart(report: AirReport): SVGSVGElement {
       ? svg('rect', {
           class: 'chart__bar',
           'data-category': b.category,
-          x: PAD.left + b.x,
-          y: PAD.top + b.y,
+          x: b.x,
+          y: b.y,
           width: b.w,
           height: b.h,
-          rx: 1.5,
         })
       : svg('rect', {
           class: 'chart__gap',
           'data-category': 'none',
-          x: PAD.left + b.x,
-          y: baseline - GAP_MARK_H,
+          x: b.x,
+          y: PLOT_H - GAP_MARK_H,
           width: b.w,
           height: GAP_MARK_H,
         }),
   );
 
-  const ticks = times.flatMap((t, i) => {
-    if (!t || hourOf(t) % TICK_EVERY_H !== 0) return [];
-    const x = PAD.left + i * slot + slot / 2;
-    const midnight = hourOf(t) === 0;
-    const label = midnight ? `${weekday(t.slice(0, 10), 'short')} ${hhmm(t)}` : hhmm(t);
-    return [
-      svg('line', { class: 'chart__tick', x1: x, x2: x, y1: baseline, y2: baseline + 4 }),
-      svg(
-        'text',
-        {
-          class: `chart__tick-label${midnight ? ' chart__tick-label--day' : ''}`,
-          x,
-          y: baseline + 18,
-          'text-anchor': 'middle',
-        },
-        label,
-      ),
-    ];
+  const verticals: SVGElement[] = [];
+  const ticks: HTMLElement[] = [];
+  times.forEach((t, i) => {
+    if (!t || hourOf(t) % TICK_EVERY_H !== 0) return;
+    const centre = i * slot + slot / 2;
+    verticals.push(
+      svg('line', { class: 'chart__vgrid', x1: centre, x2: centre, y1: 0, y2: PLOT_H }),
+    );
+    const hour = hourOf(t);
+    const day =
+      hour === 0 ? h('span', { class: 'chart__tick-day' }, weekday(t.slice(0, 10), 'short')) : null;
+    const tick = placed(
+      `chart__tick-label${hour % 12 === 0 ? '' : ' chart__tick-label--minor'}`,
+      (centre * 100) / PLOT_W,
+      hhmm(t),
+      ...(day ? [day] : []),
+    );
+    ticks.push(tick);
   });
 
-  return svg(
+  const stack = windowMarks(report, times, slot);
+  const plot = svg(
     'svg',
     {
       class: 'chart',
-      viewBox: `0 0 ${VIEW_W} ${VIEW_H}`,
+      viewBox: `0 0 ${PLOT_W} ${PLOT_H}`,
+      preserveAspectRatio: 'none',
       role: 'img',
       'aria-label': describe(report),
-      preserveAspectRatio: 'xMidYMid meet',
     },
-    ...windowBands(report, times, slot),
+    ...stack.bands,
     ...grid,
+    ...verticals,
     ...barEls,
-    svg('line', {
-      class: 'chart__baseline',
-      x1: PAD.left,
-      x2: VIEW_W - PAD.right,
-      y1: baseline,
-      y2: baseline,
-    }),
-    ...ticks,
+    svg('line', { class: 'chart__baseline', x1: 0, x2: PLOT_W, y1: PLOT_H, y2: PLOT_H }),
+  );
+
+  return h(
+    'div',
+    { class: `chart-wrap${stack.stacked ? ' chart-wrap--stacked' : ''}` },
+    h('div', { class: 'chart__plot' }, plot),
+    h('div', { class: 'chart__y', 'aria-hidden': 'true' }, ...yLabels),
+    h('div', { class: 'chart__x', 'aria-hidden': 'true' }, ...ticks),
+    h('div', { class: 'chart__marks', 'aria-hidden': 'true' }, ...stack.labels),
   );
 }
 
@@ -380,7 +405,7 @@ export function renderForecast(el: HTMLElement, report: AirReport): void {
   const card = h(
     'div',
     { class: 'card forecast' },
-    h('div', { class: 'chart-wrap' }, buildChart(report)),
+    buildChart(report),
     windowSummary(report.windows),
     h('div', { class: 'forecast__actions' }, toggle),
     table,
