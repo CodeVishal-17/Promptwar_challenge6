@@ -351,6 +351,25 @@ describe('first visit', () => {
     expect(getPlan.mock.calls[0]?.[0].profile).toEqual(DEFAULT_PROFILE);
   });
 
+  it('does not plan for the previous place when the place changes while the form is open', async () => {
+    savePlace(PLACE);
+    const geolocate = async () => ({ lat: 10, lon: 20 });
+    await boot({ ...deps(), geolocate });
+    const first = document.querySelector('dialog') as HTMLDialogElement;
+    expect(first).not.toBeNull();
+
+    // A slow "Use my location" lands while the form is open; its air is still loading.
+    getAir.mockImplementation(() => new Promise(() => {}));
+    byText(document, 'Use my location')?.click();
+    await flush();
+    expect(getAir).toHaveBeenLastCalledWith(10, 20);
+
+    byText(first, 'Skip')?.click();
+    await flush();
+    expect(hasSeenOnboarding()).toBe(true);
+    expect(getPlan).not.toHaveBeenCalled();
+  });
+
   it('saving the first-visit form stores the profile and plans with it', async () => {
     savePlace(PLACE);
     await boot(deps());

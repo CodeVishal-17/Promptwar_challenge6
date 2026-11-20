@@ -714,8 +714,16 @@
   height: var(--plot-h);
 }
 
+/*
+ * The EPA Good and Moderate fills are about 1.7:1 and 1.1:1 on a white card, so every bar gets a
+ * neutral outline (border-strong, 3.5:1 light, 3.4:1 dark) to stay visible (WCAG 1.4.11). The
+ * stroke stays 1px however far the SVG is stretched.
+ */
 .chart__bar {
   fill: var(--aqi-color);
+  stroke: var(--color-border-strong);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
 }
 
 .chart__gap {
@@ -1715,6 +1723,12 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
+}
+
+.ask__privacy {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 
 .ask__disclaimer {

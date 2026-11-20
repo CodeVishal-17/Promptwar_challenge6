@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { answerQuestion } from '../../../server/src/services/askService.js';
 import type { GeminiClient } from '../../../server/src/services/gemini.js';
 import { profileWith, smoggyReport } from '../domain/fixtures.js';
@@ -55,14 +55,26 @@ describe('answerQuestion', () => {
     expect((await answerQuestion(ctx, 'Hi', deps(client))).answer).toBe(UNRELIABLE);
   });
 
-  it.each([
-    ['there is no client', null],
-    ['the client throws', { generateJson: () => Promise.reject(new Error('down')) }],
-    ['the response shape is wrong', fake({ nope: 1 }).client],
-  ])('says the assistant is unavailable when %s', async (_n, gemini) => {
-    expect(await answerQuestion(ctx, 'Hi?', deps(gemini))).toEqual({
-      answer: UNAVAILABLE,
-      aiUsed: false,
+  describe('when Gemini fails', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it.each([
+      ['there is no client', null, null],
+      [
+        'the client throws',
+        { generateJson: () => Promise.reject(new TypeError('down')) },
+        'TypeError',
+      ],
+      ['the response shape is wrong', fake({ nope: 1 }).client, 'ZodError'],
+    ])('says the assistant is unavailable when %s', async (_n, gemini, name) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      expect(await answerQuestion(ctx, 'PRIVATE-QUESTION?', deps(gemini))).toEqual({
+        answer: UNAVAILABLE,
+        aiUsed: false,
+      });
+      if (name === null) expect(warn).not.toHaveBeenCalled();
+      else expect(warn.mock.calls).toEqual([['gemini_failed', name]]);
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('PRIVATE-QUESTION');
     });
   });
 

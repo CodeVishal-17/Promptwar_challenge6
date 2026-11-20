@@ -135,7 +135,18 @@ export function mountLocationSearch(
     input.setAttribute('aria-expanded', 'false');
   }
 
+  /** Drops any pending or in-flight search, so a late answer cannot reopen the list. */
+  function cancelSearch(): void {
+    clearTimeout(timer);
+    inFlight?.abort();
+    inFlight = null;
+    delete combobox.dataset.busy;
+  }
+
   function pick(place: Place): void {
+    cancelSearch();
+    results = [];
+    listbox.replaceChildren();
     close();
     input.value = formatPlace(place);
     setMessage('');
@@ -170,7 +181,8 @@ export function mountLocationSearch(
       return;
     }
     setMessage('');
-    open();
+    // Results that land after the user has moved on fill the list but do not pop it open.
+    if (document.activeElement === input) open();
     const noun = places.length === 1 ? 'place' : 'places';
     announce(`${places.length} ${noun} found. Use the up and down arrow keys to choose.`);
   }
@@ -196,10 +208,7 @@ export function mountLocationSearch(
   }
 
   input.addEventListener('input', () => {
-    clearTimeout(timer);
-    inFlight?.abort();
-    inFlight = null;
-    delete combobox.dataset.busy;
+    cancelSearch();
     const query = input.value.trim();
     if (query.length < MIN_QUERY) {
       results = [];

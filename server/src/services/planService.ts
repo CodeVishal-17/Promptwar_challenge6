@@ -5,7 +5,7 @@ import type { PlanContext } from '../domain/catalog.js';
 import { passesNumberGuard } from '../domain/numberGuard.js';
 import { buildFallbackPlan, selectCandidates, toItem } from '../domain/planner.js';
 import { COMMON_RULES, buildAiContext } from './aiContext.js';
-import type { GeminiClient } from './gemini.js';
+import { type GeminiClient, logGeminiFailure } from './gemini.js';
 
 /** How long to wait for Gemini before using the built-in plan. */
 const PLAN_TIMEOUT_MS = 10_000;
@@ -64,7 +64,8 @@ export async function makePlan(
       timeoutMs: PLAN_TIMEOUT_MS,
     });
     ai = AiPlan.parse(raw);
-  } catch {
+  } catch (err) {
+    logGeminiFailure(err);
     return fallback;
   }
 

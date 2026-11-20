@@ -30,8 +30,15 @@ export interface ExposureScenario {
   minutes: number;
 }
 
+/** Whole µg from 10 up; one decimal below, and "<0.1" rather than a misleading "0". */
+function formatDose(ug: number): string {
+  if (ug >= 10) return formatNumber(ug, 0);
+  if (ug > 0 && ug < 0.05) return '<0.1';
+  return formatNumber(ug, 1);
+}
+
 const describe = (s: ExposureScenario): string =>
-  `${formatNumber(s.conc, 1)} µg/m³ × ${formatNumber(s.rate, 4)} m³/min × ${formatNumber(s.minutes, 0)} min = ${formatNumber(inhaledDoseUg(s.conc, s.rate, s.minutes), 0)} µg`;
+  `${formatNumber(s.conc, 1)} µg/m³ × ${formatNumber(s.rate, 4)} m³/min × ${formatNumber(s.minutes, 0)} min = ${formatDose(inhaledDoseUg(s.conc, s.rate, s.minutes))} µg`;
 
 /**
  * Percentage change in inhaled PM2.5 going from scenario `a` to scenario `b`,

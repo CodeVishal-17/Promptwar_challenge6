@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildFallbackPlan, selectCandidates } from '../../../server/src/domain/planner.js';
 import type { GeminiClient } from '../../../server/src/services/gemini.js';
 import { makePlan } from '../../../server/src/services/planService.js';
@@ -167,16 +167,31 @@ describe('makePlan', () => {
     expect(item.time).toBe(timed.suggestedTime);
   });
 
-  it.each([
-    ['the client throws', failing(new Error('boom'))],
-    ['the client rejects with a timeout', failing(new Error('Gemini request timed out'))],
-    ['the JSON shape is wrong', fake({ summary: 5, items: 'nope' })],
-    ['an item lacks an action id', fake({ summary: 's', items: [{ why: 'x' }] })],
-    ['there is no client', null],
-  ])('returns the fallback plan when %s', async (_name, gemini) => {
-    const plan = await makePlan(ctx, { gemini, now: clock });
-    expect(plan).toEqual(fallback);
-    expect(plan.aiUsed).toBe(false);
+  describe('when Gemini fails', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it.each([
+      ['the client throws', failing(new Error('boom')), 'Error'],
+      [
+        'the client rejects with a timeout',
+        failing(new Error('Gemini request timed out')),
+        'Error',
+      ],
+      ['the JSON shape is wrong', fake({ summary: 5, items: 'nope' }), 'ZodError'],
+      ['an item lacks an action id', fake({ summary: 's', items: [{ why: 'x' }] }), 'ZodError'],
+      ['the client rejects with a non-error', failing('nope'), 'unknown'],
+      ['there is no client', null, null],
+    ])(
+      'returns the fallback plan when %s, logging only the error name',
+      async (_n, gemini, name) => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const plan = await makePlan(ctx, { gemini, now: clock });
+        expect(plan).toEqual(fallback);
+        expect(plan.aiUsed).toBe(false);
+        if (name === null) expect(warn).not.toHaveBeenCalled();
+        else expect(warn.mock.calls).toEqual([['gemini_failed', name]]);
+      },
+    );
   });
 
   it('sends only minimal profile data and no place or raw series', async () => {

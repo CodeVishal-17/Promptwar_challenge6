@@ -46,6 +46,17 @@ describe('askPanel', () => {
     expect(root.textContent).toContain('General guidance, not medical advice.');
   });
 
+  it('says beside the textarea that questions go to Gemini, linked by aria-describedby', () => {
+    const { textarea } = mount(resolved());
+    const notice = root.querySelector('.ask__privacy');
+    expect(notice?.textContent).toBe(
+      "Questions you type are sent to Google Gemini to answer. Don't include personal details.",
+    );
+    const described = (textarea.getAttribute('aria-describedby') ?? '').split(' ');
+    expect(described).toContain(notice?.id);
+    expect(described.every((id) => document.getElementById(id))).toBe(true);
+  });
+
   it('disables submit when empty, whitespace-only or over 500 characters', () => {
     const { submit, type } = mount(resolved());
     expect(submit.disabled).toBe(true);

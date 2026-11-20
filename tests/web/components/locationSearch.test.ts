@@ -195,6 +195,58 @@ describe('keyboard', () => {
   });
 });
 
+describe('no stale list after a pick or a blur', () => {
+  it('a pick cancels the pending search and clears the results', async () => {
+    mount();
+    type('Sao');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(input().getAttribute('aria-expanded')).toBe('true');
+    type('São P'); // starts a new debounce while the old options are still listed
+    key('ArrowDown');
+    key('Enter');
+    expect(onPick).toHaveBeenCalledWith(PLACE);
+    await vi.advanceTimersByTimeAsync(400);
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(listbox().hidden).toBe(true);
+    expect(options()).toHaveLength(0);
+    key('ArrowDown');
+    expect(input().getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('a pick aborts a search already in flight, and its late answer opens nothing', async () => {
+    let resolve: (p: Place[]) => void = () => {};
+    let signal: AbortSignal | undefined;
+    search.mockImplementation((_q, s) => {
+      signal = s;
+      return new Promise((r) => (resolve = r));
+    });
+    mount(async () => ({ lat: 10, lon: 20 }));
+    type('Lima');
+    await vi.advanceTimersByTimeAsync(300);
+    locateButton().click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onPick).toHaveBeenCalledOnce();
+    expect(signal?.aborted).toBe(true);
+    resolve([PLACE]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(listbox().hidden).toBe(true);
+    expect(input().getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('results that arrive after the input lost focus fill the list but do not open it', async () => {
+    mount();
+    type('Lima');
+    input().blur();
+    await vi.advanceTimersByTimeAsync(300);
+    expect(search).toHaveBeenCalledOnce();
+    expect(listbox().hidden).toBe(true);
+    expect(input().getAttribute('aria-expanded')).toBe('false');
+    input().focus();
+    key('ArrowDown');
+    expect(input().getAttribute('aria-expanded')).toBe('true');
+  });
+});
+
 describe('use my location', () => {
   it('picks a rounded place with an empty country code, so grid figures use the world average', async () => {
     mount(async () => ({ lat: 28.613912, lon: 77.209023 }));

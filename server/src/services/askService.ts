@@ -4,7 +4,7 @@ import type { PlanContext } from '../domain/catalog.js';
 import { passesNumberGuard } from '../domain/numberGuard.js';
 import { selectCandidates } from '../domain/planner.js';
 import { COMMON_RULES, buildAiContext } from './aiContext.js';
-import type { GeminiClient } from './gemini.js';
+import { type GeminiClient, logGeminiFailure } from './gemini.js';
 
 /** How long to wait for Gemini before telling the user the assistant is unavailable. */
 const ASK_TIMEOUT_MS = 8_000;
@@ -48,7 +48,8 @@ export async function answerQuestion(
         timeoutMs: ASK_TIMEOUT_MS,
       }),
     );
-  } catch {
+  } catch (err) {
+    logGeminiFailure(err);
     return { answer: UNAVAILABLE, aiUsed: false };
   }
   if (!reply.onTopic) return { answer: OFF_TOPIC, aiUsed: true };

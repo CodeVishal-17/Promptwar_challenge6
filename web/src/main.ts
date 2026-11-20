@@ -170,8 +170,11 @@ function editProfile(): void {
 
 /** First visit: ask about the household once, then plan with whatever they chose. */
 function onboardThenPlan(place: Place, hasReading: boolean): void {
+  const mine = generation;
   const done = (profile: Profile) => {
     markOnboardingSeen();
+    // The place may have changed while the form was open (say, a slow "Use my location").
+    if (mine !== generation || loaded?.place !== place) return;
     void requestPlan(place, profile, { hasReading });
   };
   openProfileForm(

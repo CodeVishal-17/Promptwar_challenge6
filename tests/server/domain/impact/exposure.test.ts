@@ -84,6 +84,17 @@ describe('exposureChangeImpact', () => {
     expect(impact.value).toBe(-83);
   });
 
+  it('shows small doses with one decimal, so a clean day never reads "0 µg"', () => {
+    const dose = (conc: number, r: number, minutes: number) =>
+      exposureChangeImpact('x', { conc, rate: r, minutes }, { conc, rate: r, minutes }).inputs[0]
+        ?.value;
+    expect(dose(150, 0.05, 45)).toMatch(/= 338 µg$/); // 337.5: whole µg from 10 up
+    expect(dose(6, 0.012, 10)).toMatch(/= 0\.7 µg$/); // 0.72
+    expect(dose(20, 0.011, 30)).toMatch(/= 6\.6 µg$/); // 6.6
+    expect(dose(6, 0.0042, 1)).toMatch(/= <0\.1 µg$/); // 0.0252
+    expect(dose(6, 0.0042, 1)).not.toMatch(/= 0 µg/);
+  });
+
   it('throws when the baseline dose is zero', () => {
     expect(() =>
       exposureChangeImpact('x', { conc: 0, rate, minutes: 30 }, { conc: 5, rate, minutes: 30 }),

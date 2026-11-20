@@ -4,6 +4,9 @@ import { h } from '../dom.js';
 
 export const MAX_QUESTION = 500;
 export const DISCLAIMER = 'General guidance, not medical advice.';
+/** Free text leaves the browser, so say where it goes right where it is typed. */
+export const ASK_PRIVACY =
+  "Questions you type are sent to Google Gemini to answer. Don't include personal details.";
 export const NO_PLACE = 'Choose a place first.';
 export const RATE_LIMITED = "You've asked a lot in a short time — please wait a few minutes.";
 export const GENERIC_ERROR = "Sorry, I couldn't answer that just now. Please try again.";
@@ -55,8 +58,9 @@ export function mountAskPanel(
     id: `${id}-question`,
     class: 'input ask__input',
     rows: '3',
-    'aria-describedby': `${id}-count`,
+    'aria-describedby': `${id}-privacy ${id}-count`,
   });
+  const privacy = h('p', { class: 'ask__privacy', id: `${id}-privacy` }, ASK_PRIVACY);
   const counter = h('p', { class: 'ask__count', id: `${id}-count` });
   const submit = h('button', { type: 'submit', class: 'btn btn--primary ask__submit' }, 'Ask');
   const answer = h('div', { class: 'ask__answer', 'aria-live': 'polite', 'aria-atomic': 'true' });
@@ -144,6 +148,7 @@ export function mountAskPanel(
       'form',
       { class: 'card ask', novalidate: true, onsubmit: (e) => void onSubmit(e) },
       h('label', { class: 'field-label', for: textarea.id }, "Ask about today's air"),
+      privacy,
       textarea,
       h(
         'div',
