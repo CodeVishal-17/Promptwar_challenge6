@@ -26,6 +26,7 @@ describe('renderMethod', () => {
     expect(text).not.toContain('24-hour average');
     expect(text).toContain('8-hour');
     expect(text).toContain('0 to 500');
+    expect(text).toContain('cleanest daytime hours');
   });
 
   it('lists every source the numbers rely on, each as a safe https link', () => {

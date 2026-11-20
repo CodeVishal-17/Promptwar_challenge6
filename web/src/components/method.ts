@@ -75,7 +75,7 @@ export function renderMethod(el: HTMLElement): void {
         h(
           'p',
           {},
-          'We compute the US EPA Air Quality Index ourselves, on its scale from 0 to 500 and above, using the EPA’s 2024 breakpoints for PM2.5. Particles (PM2.5 and PM10) use the EPA’s NowCast, as AirNow does for hourly reports: a weighted average of the last 12 hours that leans on the latest hours when the air is changing fast, read against the 24-hour breakpoints. Ozone uses the higher of its 8-hour and 1-hour figures, and nitrogen dioxide the 1-hour figure. The highest of these is the AQI, and that pollutant is shown as the main one. Because the averages look back over earlier hours, “now” is an hourly estimate rather than an official daily report.',
+          'We compute the US EPA Air Quality Index ourselves, on its scale from 0 to 500 and above, using the EPA’s 2024 breakpoints for PM2.5. Particles (PM2.5 and PM10) use the EPA’s NowCast, as AirNow does for hourly reports: a weighted average of the last 12 hours that leans on the latest hours when the air is changing fast, read against the 24-hour breakpoints. Ozone uses the higher of its 8-hour and 1-hour figures, and nitrogen dioxide the 1-hour figure. The highest of these is the AQI, and that pollutant is shown as the main one. Because the averages look back over earlier hours, “now” is an hourly estimate rather than an official daily report. The cleanest daytime hours are the best two hours between 06:00 and 21:00, when most people are up and about; the worst two hours can fall at any time.',
         ),
       ),
       block(

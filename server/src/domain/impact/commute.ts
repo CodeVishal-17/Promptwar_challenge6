@@ -89,6 +89,10 @@ const MODE_LABEL: Record<CommuteMode, string> = {
 
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** Spec 7.1: bus and train occupancy vary by country, so the per-passenger basis is stated. */
+const OCCUPANCY_ASSUMPTION =
+  'Bus and metro or train figures are per passenger at UK average occupancy (the DESNZ per passenger-km basis), so a fuller vehicle emits less per person and an emptier one more.';
+
 const isFuel = (m: CommuteMode): m is FuelMode => m in EMISSION_FACTORS_KG_PER_KM;
 const isElectric = (m: CommuteMode): m is ElectricMode => m in ELECTRIC_KWH;
 
@@ -135,9 +139,9 @@ function modeFactor(mode: CommuteMode, countryCode?: string): ModeFactor {
       basis: `${formatNumber(f.total, 5)} kg CO₂e per ${f.per} (${f.description})`,
       assumptions: [
         `${cap(MODE_LABEL[mode])}: ${formatNumber(f.tailpipe, 5)} kg CO₂e per ${f.per} from the fuel burned plus ${formatNumber(f.wellToTank, 5)} kg for producing and delivering the fuel (DESNZ 2026, ${f.description}; UK figures used for every country).`,
-        ...(f.per === 'vehicle-km'
-          ? [`The ${MODE_LABEL[mode]} carries only you (emissions per vehicle-km).`]
-          : []),
+        f.per === 'vehicle-km'
+          ? `The ${MODE_LABEL[mode]} carries only you (emissions per vehicle-km).`
+          : OCCUPANCY_ASSUMPTION,
       ],
       sources: [DESNZ_2026],
     };
@@ -145,8 +149,9 @@ function modeFactor(mode: CommuteMode, countryCode?: string): ModeFactor {
   if (isElectric(mode)) {
     const e = ELECTRIC_KWH[mode];
     const g = gridIntensityFor(countryCode);
+    const code = countryCode?.trim().toUpperCase();
     const where = g.isWorldAverage
-      ? `the world average grid (${formatNumber(g.gPerKwh, 0)} g CO₂e/kWh, ${g.year}), because there is no grid figure for ${countryCode?.trim() ? countryCode.trim().toUpperCase() : 'your country'}`
+      ? `the world average grid (${formatNumber(g.gPerKwh, 0)} g CO₂e/kWh, ${g.year})${code ? `, because there is no grid figure for ${code}` : ''}`
       : `the ${g.countryCode} grid (${formatNumber(g.gPerKwh, 0)} g CO₂e/kWh, ${g.year})`;
     const kgPerKm = (e.kwhPerKm * g.gPerKwh) / 1000;
     return {
@@ -154,7 +159,9 @@ function modeFactor(mode: CommuteMode, countryCode?: string): ModeFactor {
       basis: `${formatNumber(e.kwhPerKm, 5)} kWh per ${e.per} × ${formatNumber(g.gPerKwh, 0)} g CO₂e/kWh`,
       assumptions: [
         `${cap(MODE_LABEL[mode])}: ${formatNumber(e.kwhPerKm, 5)} kWh per ${e.per}, ${e.description}, DESNZ 2026, on ${where}.`,
+        ...(code ? [] : ['No country was given, so the world-average grid figure is used.']),
         ...(e.derivation ? [e.derivation] : []),
+        ...(e.per === 'passenger-km' ? [OCCUPANCY_ASSUMPTION] : []),
         'Grid intensity is lifecycle emissions per kWh generated; losses in the wires between power station and plug are not included.',
       ],
       sources: [DESNZ_2026, GRID_INTENSITY_SOURCE],

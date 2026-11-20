@@ -222,7 +222,7 @@ export const ACTIONS: readonly Action[] = [
     section: 'routine',
     title: 'Wear a snug N95 or FFP2 mask if you must go out',
     defaultWhy:
-      'A well-fitted respirator filters out most fine smog particles before you breathe them in. A loose cloth or surgical mask lets them slip in around the edges, and children’s faces are usually too small to seal one, so for them staying in is safer.',
+      'A well-fitted respirator filters out most fine smog particles before you breathe them in. A loose cloth or surgical mask lets them slip in around the edges, and children’s faces are usually too small to seal one, so for them staying in is safer. If you have a heart or lung condition, check with your doctor before using a respirator.',
     priority: 85,
     applies: aqiAtLeast(AQI_UNHEALTHY),
     sources: [AIRNOW_PM_GUIDE, EPA_WILDFIRES_IAQ],
@@ -411,7 +411,7 @@ export const ACTIONS: readonly Action[] = [
     section: 'sustainable',
     title: 'Never burn rubbish, leaves or crop waste',
     defaultWhy:
-      'Open burning puts thick smoke and fine particles into the air at street level, and on still winter evenings it hangs around. Sending waste for collection stops it at the source.',
+      'Open burning puts thick smoke and fine particles straight into the air around homes. Sending waste for collection stops it at the source.',
     priority: 76,
     applies: () => true,
     sources: [WHO_AMBIENT_AIR],
@@ -441,8 +441,7 @@ export const ACTIONS: readonly Action[] = [
     id: 'combine-trips',
     section: 'sustainable',
     title: 'Combine errands into one trip',
-    defaultWhy:
-      'Fewer, planned trips mean fewer cold starts and less time idling in traffic, so less exhaust on your street.',
+    defaultWhy: 'Fewer, planned trips mean less driving, so less exhaust on your street.',
     priority: 58,
     applies: commuteIn(CAR_MODES),
     sources: [WHO_AMBIENT_AIR],
@@ -463,8 +462,9 @@ export const ACTIONS: readonly Action[] = [
     defaultWhy:
       'Electric heating puts no smoke or exhaust into your home or street, so the smog you add in winter drops at the source.',
     priority: 50,
-    applies: (ctx) =>
-      ctx.profile.home.heating === 'gas' || ctx.profile.home.heating === 'wood_coal',
+    // Wood and coal only: WHO counts gas among the clean household fuels, so its sources do
+    // not support this card for gas heating.
+    applies: (ctx) => ctx.profile.home.heating === 'wood_coal',
     sources: [WHO_AMBIENT_AIR, WHO_HOUSEHOLD_AIR],
   },
   {
@@ -472,7 +472,7 @@ export const ACTIONS: readonly Action[] = [
     section: 'sustainable',
     title: 'Keep up your low-emission commute',
     defaultWhy:
-      'Buses, trains, bikes, walking and electric cars add little or no tailpipe exhaust to your street. Your commute is already helping, so hold on to it.',
+      'Bikes, walking and electric cars add no tailpipe exhaust to your street, and a bus or train carries many people for far less exhaust per person than a car. Your commute is already helping, so hold on to it.',
     priority: 45,
     applies: commuteIn(LOW_EMISSION_MODES),
     sources: [DESNZ_2026, WHO_AMBIENT_AIR],

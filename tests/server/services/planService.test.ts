@@ -204,7 +204,8 @@ describe('makePlan', () => {
     await makePlan(ctx, { gemini: client, now: clock });
     const { user, system } = client.calls[0]!;
     const context = JSON.parse(/<context>([\s\S]*)<\/context>/.exec(user)?.[1] ?? '{}');
-    expect(context.air.bestWindow).toMatchObject({ day: 'tomorrow', from: '15:00' });
+    expect(context.air.bestWindow).toBeUndefined();
+    expect(context.air.cleanestDaytimeWindow).toMatchObject({ day: 'tomorrow', from: '15:00' });
     expect(context.air.worstWindow.day).toBe('today');
     const move = context.candidates.find(
       (c: { actionId: string }) => c.actionId === 'move-exercise-to-best-window',

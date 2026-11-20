@@ -46,7 +46,7 @@ export function buildAiContext(ctx: PlanContext, cands: Candidate[]): AiContext 
           aqi: now.aqi,
           category: CATEGORY_LABEL[now.category],
           dominantPollutant: POLLUTANT_WORDS[now.dominant],
-          bestWindow: windowSummary(ctx, 'best'),
+          cleanestDaytimeWindow: windowSummary(ctx, 'best'),
           worstWindow: windowSummary(ctx, 'worst'),
           outlookCategories: ctx.report.outlook.map((d) => CATEGORY_LABEL[d.category]),
         }

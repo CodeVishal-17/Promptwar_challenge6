@@ -124,13 +124,14 @@ function weekday(date: string, style: 'long' | 'short'): string {
 /** The window with its weekday: in a 48-hour view, "19:00" alone could be today or tomorrow. */
 const windowRange = (w: AirWindow): string =>
   `${weekday(w.start.slice(0, 10), 'short')} ${hhmm(w.start)}–${hhmm(w.end)}`;
-const WINDOW_WORD = { best: 'Cleanest air', worst: 'Worst' } as const;
+/** The best window only counts 06:00–21:00 (server windows.ts), so it is the cleanest daytime hours. */
+const WINDOW_WORD = { best: 'Cleanest daytime hours', worst: 'Worst' } as const;
 
 function describe(report: AirReport): string {
   const parts: string[] = [];
   const best = report.windows.find((w) => w.kind === 'best');
   const worst = report.windows.find((w) => w.kind === 'worst');
-  if (best) parts.push(`Cleanest air ${windowRange(best)}`);
+  if (best) parts.push(`${WINDOW_WORD.best} ${windowRange(best)}`);
   if (worst) parts.push(`${best ? 'worst' : 'Worst'} ${windowRange(worst)}`);
   const hours = report.hourly.length;
   const head = `Bar chart of the US AQI for the next ${hours} hours.`;

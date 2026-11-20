@@ -129,6 +129,22 @@ describe('commuteCo2', () => {
     expect(commuteCo2('car_ev', 10, 'FR').sources.map((s) => s.url)).toContain(grid.source.url);
   });
 
+  it('says plainly when no country was given', () => {
+    const text = commuteCo2('car_ev', 10).assumptions.join(' ');
+    expect(text).toContain('No country was given, so the world-average grid figure is used.');
+    expect(text).not.toMatch(/your country/);
+    expect(commuteCo2('car_ev', 10, ' ').assumptions.join(' ')).toContain('No country was given');
+    expect(commuteCo2('car_ev', 10, 'ZZ').assumptions.join(' ')).toMatch(/no grid figure for ZZ/);
+  });
+
+  it('states the occupancy assumption for per-passenger modes only', () => {
+    const line = /UK average occupancy.*DESNZ.*per passenger-km/;
+    expect(commuteCo2('bus', 5).assumptions.join(' ')).toMatch(line);
+    expect(commuteCo2('rail', 5, 'GB').assumptions.join(' ')).toMatch(line);
+    expect(commuteCo2('car_petrol', 5).assumptions.join(' ')).not.toMatch(/occupancy/);
+    expect(commuteCo2('car_ev', 5, 'GB').assumptions.join(' ')).not.toMatch(/occupancy/);
+  });
+
   it('cites DESNZ for fuel modes', () => {
     const r = commuteCo2('bus', 5);
     expect(r.sources.some((s) => s.url.includes('gov.uk'))).toBe(true);

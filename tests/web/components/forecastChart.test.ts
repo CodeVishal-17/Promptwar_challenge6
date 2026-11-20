@@ -115,7 +115,7 @@ describe('renderForecast', () => {
     expect(svg?.getAttribute('role')).toBe('img');
     expect(svg?.getAttribute('viewBox')).toBeTruthy();
     expect(svg?.getAttribute('aria-label')).toContain(
-      'Cleanest air Fri 16:00–18:00, worst Sat 20:00–22:00',
+      'Cleanest daytime hours Fri 16:00–18:00, worst Sat 20:00–22:00',
     );
     expect(svg?.hasAttribute('style')).toBe(false);
   });
@@ -183,7 +183,8 @@ describe('renderForecast', () => {
     const labels = [...el.querySelectorAll('.chart__window-label')].map((n) => n.textContent);
     expect(labels).toEqual(['Cleanest', 'Worst']);
     const summary = el.querySelector('.forecast__windows')?.textContent ?? '';
-    expect(summary).toContain('Cleanest air');
+    expect(summary).toContain('Cleanest daytime hours');
+    expect(summary).not.toContain('Cleanest air');
     expect(summary).toContain('Fri 16:00–18:00');
     expect(summary).toContain('Worst');
     expect(summary).toContain('Sat 20:00–22:00');

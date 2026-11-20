@@ -180,6 +180,11 @@ describe('exercise and school actions', () => {
     expect(a.applies(ctx(DEFAULT_PROFILE, moderate))).toBe(false);
     expect(a.impact).toBeUndefined();
   });
+  it('n95-outdoors carries the EPA caveat for heart and lung conditions', () => {
+    expect(byId('n95-outdoors').defaultWhy).toContain(
+      'If you have a heart or lung condition, check with your doctor before using a respirator.',
+    );
+  });
 });
 
 describe('indoor actions', () => {
@@ -272,6 +277,18 @@ describe('sustainable actions', () => {
     const a = byId('no-waste-burning');
     expect(a.applies(ctx(DEFAULT_PROFILE, clean))).toBe(true);
     expect(a.impact).toBeUndefined();
+  });
+  it('words-only copy claims no more than its sources', () => {
+    expect(byId('combine-trips').defaultWhy).not.toMatch(/cold start/i);
+    expect(byId('no-waste-burning').defaultWhy).not.toMatch(/still|evening/i);
+    expect(byId('keep-low-emission-commute').defaultWhy).not.toMatch(/little or no/i);
+    expect(byId('keep-low-emission-commute').defaultWhy).toMatch(/far less exhaust per person/);
+  });
+  it('electrify-heating is offered for wood or coal heating only, not gas', () => {
+    const a = byId('electrify-heating');
+    expect(a.applies(ctx(profileWith({ home: { heating: 'wood_coal' } })))).toBe(true);
+    expect(a.applies(ctx(profileWith({ home: { heating: 'gas' } })))).toBe(false);
+    expect(a.applies(ctx(profileWith({ home: { heating: 'electric' } })))).toBe(false);
   });
   it('keep-low-emission-commute celebrates a low-emission commute', () => {
     const a = byId('keep-low-emission-commute');
