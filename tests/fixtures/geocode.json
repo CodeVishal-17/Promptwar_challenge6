@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "id": 1,
+      "name": "São Paulo",
+      "latitude": -23.5475,
+      "longitude": -46.63611,
+      "admin1": "São Paulo",
+      "country": "Brazil",
+      "country_code": "br"
+    },
+    {
+      "id": 2,
+      "name": "Sao Paulo de Olivença",
+      "latitude": -3.37,
+      "longitude": -68.87,
+      "country": "Brazil",
+      "country_code": "BR"
+    },
+    { "id": 3, "name": "Nowhere", "latitude": 1, "longitude": 2, "country": "Unknown" }
+  ],
+  "generationtime_ms": 0.9
+}

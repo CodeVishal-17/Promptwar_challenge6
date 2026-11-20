@@ -54,3 +54,13 @@ export interface AirReport {
   windows: AirWindow[];
   outlook: DailyOutlook[];
 }
+
+/** A geocoded place a user can pick. */
+export interface Place {
+  name: string;
+  admin1?: string;
+  country: string;
+  countryCode: string;
+  lat: number;
+  lon: number;
+}
