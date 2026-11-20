@@ -88,7 +88,7 @@ function healthFor(ctx: PlanContext): HealthGuidance {
   };
 }
 
-function toItem(c: Candidate): PlanItem {
+export function toItem(c: Candidate): PlanItem {
   const { action, impact, suggestedTime } = c;
   return {
     actionId: action.id,
