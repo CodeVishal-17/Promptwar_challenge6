@@ -154,3 +154,16 @@ export interface MinimalProfile {
     indoorSmoking: boolean;
   };
 }
+
+/** Body of `POST /api/plan`. */
+export interface PlanRequest {
+  lat: number;
+  lon: number;
+  countryCode?: string;
+  profile: Profile;
+}
+
+/** Body of `POST /api/ask`. */
+export interface AskRequest extends PlanRequest {
+  question: string;
+}
