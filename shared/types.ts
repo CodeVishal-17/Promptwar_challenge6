@@ -64,3 +64,24 @@ export interface Place {
   lat: number;
   lon: number;
 }
+
+export type CommuteMode =
+  'car_petrol' | 'car_diesel' | 'car_ev' | 'motorbike' | 'bus' | 'rail' | 'bike' | 'walk';
+
+export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'high';
+
+export type AgeGroup = 'child' | 'adult' | 'older';
+
+/** A number computed in code from cited constants, with everything needed to explain it. */
+export interface Impact {
+  label: string;
+  /** Signed percentage change for % impacts (negative = less); kg CO₂e/yr saved for commute switches. */
+  value: number;
+  unit: string;
+  /** Human-readable string built from `value`, e.g. "−79% indoor PM2.5". */
+  display: string;
+  formula: string;
+  inputs: { label: string; value: string }[];
+  assumptions: string[];
+  sources: Source[];
+}

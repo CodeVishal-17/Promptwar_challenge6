@@ -1,0 +1,865 @@
+{
+  "source": {
+    "title": "Lifecycle carbon intensity of electricity (g CO₂e/kWh), Our World in Data, based on Ember (2026) and Energy Institute Statistical Review of World Energy (2026)",
+    "url": "https://ourworldindata.org/grapher/carbon-intensity-electricity",
+    "year": 2026
+  },
+  "worldAverage": {
+    "gPerKwh": 458.29,
+    "year": 2025
+  },
+  "countries": {
+    "AE": {
+      "gPerKwh": 467.51,
+      "year": 2024
+    },
+    "AF": {
+      "gPerKwh": 131.31,
+      "year": 2024
+    },
+    "AG": {
+      "gPerKwh": 594.6,
+      "year": 2024
+    },
+    "AL": {
+      "gPerKwh": 25.18,
+      "year": 2024
+    },
+    "AM": {
+      "gPerKwh": 211.93,
+      "year": 2025
+    },
+    "AO": {
+      "gPerKwh": 185.38,
+      "year": 2024
+    },
+    "AR": {
+      "gPerKwh": 346,
+      "year": 2025
+    },
+    "AS": {
+      "gPerKwh": 611.11,
+      "year": 2024
+    },
+    "AT": {
+      "gPerKwh": 116.91,
+      "year": 2025
+    },
+    "AU": {
+      "gPerKwh": 525.18,
+      "year": 2025
+    },
+    "AW": {
+      "gPerKwh": 550,
+      "year": 2024
+    },
+    "AZ": {
+      "gPerKwh": 631.9,
+      "year": 2025
+    },
+    "BA": {
+      "gPerKwh": 570.64,
+      "year": 2025
+    },
+    "BB": {
+      "gPerKwh": 594.6,
+      "year": 2024
+    },
+    "BD": {
+      "gPerKwh": 696.13,
+      "year": 2025
+    },
+    "BE": {
+      "gPerKwh": 149.82,
+      "year": 2025
+    },
+    "BF": {
+      "gPerKwh": 562.13,
+      "year": 2024
+    },
+    "BG": {
+      "gPerKwh": 275.55,
+      "year": 2025
+    },
+    "BH": {
+      "gPerKwh": 902.24,
+      "year": 2024
+    },
+    "BI": {
+      "gPerKwh": 183.67,
+      "year": 2024
+    },
+    "BJ": {
+      "gPerKwh": 584.16,
+      "year": 2024
+    },
+    "BM": {
+      "gPerKwh": 639.34,
+      "year": 2024
+    },
+    "BN": {
+      "gPerKwh": 892.09,
+      "year": 2024
+    },
+    "BO": {
+      "gPerKwh": 481.29,
+      "year": 2025
+    },
+    "BR": {
+      "gPerKwh": 109.95,
+      "year": 2025
+    },
+    "BS": {
+      "gPerKwh": 653.33,
+      "year": 2024
+    },
+    "BT": {
+      "gPerKwh": 23.64,
+      "year": 2024
+    },
+    "BW": {
+      "gPerKwh": 851.31,
+      "year": 2024
+    },
+    "BY": {
+      "gPerKwh": 309.25,
+      "year": 2025
+    },
+    "BZ": {
+      "gPerKwh": 170.21,
+      "year": 2024
+    },
+    "CA": {
+      "gPerKwh": 190.72,
+      "year": 2025
+    },
+    "CD": {
+      "gPerKwh": 27.64,
+      "year": 2024
+    },
+    "CF": {
+      "gPerKwh": 0,
+      "year": 2023
+    },
+    "CG": {
+      "gPerKwh": 716.12,
+      "year": 2024
+    },
+    "CH": {
+      "gPerKwh": 39.22,
+      "year": 2025
+    },
+    "CI": {
+      "gPerKwh": 405.01,
+      "year": 2024
+    },
+    "CK": {
+      "gPerKwh": 250,
+      "year": 2024
+    },
+    "CL": {
+      "gPerKwh": 289.49,
+      "year": 2025
+    },
+    "CM": {
+      "gPerKwh": 225.9,
+      "year": 2024
+    },
+    "CN": {
+      "gPerKwh": 525.34,
+      "year": 2025
+    },
+    "CO": {
+      "gPerKwh": 186.81,
+      "year": 2025
+    },
+    "CR": {
+      "gPerKwh": 24.2,
+      "year": 2025
+    },
+    "CU": {
+      "gPerKwh": 642.82,
+      "year": 2024
+    },
+    "CV": {
+      "gPerKwh": 461.54,
+      "year": 2024
+    },
+    "CY": {
+      "gPerKwh": 489,
+      "year": 2025
+    },
+    "CZ": {
+      "gPerKwh": 401.46,
+      "year": 2025
+    },
+    "DE": {
+      "gPerKwh": 329.65,
+      "year": 2025
+    },
+    "DJ": {
+      "gPerKwh": 450,
+      "year": 2024
+    },
+    "DK": {
+      "gPerKwh": 114.41,
+      "year": 2025
+    },
+    "DM": {
+      "gPerKwh": 600,
+      "year": 2023
+    },
+    "DO": {
+      "gPerKwh": 537.48,
+      "year": 2025
+    },
+    "DZ": {
+      "gPerKwh": 632.94,
+      "year": 2024
+    },
+    "EC": {
+      "gPerKwh": 159.02,
+      "year": 2025
+    },
+    "EE": {
+      "gPerKwh": 319.15,
+      "year": 2025
+    },
+    "EG": {
+      "gPerKwh": 563.23,
+      "year": 2025
+    },
+    "EH": {
+      "gPerKwh": 666.67,
+      "year": 2009
+    },
+    "ER": {
+      "gPerKwh": 577.78,
+      "year": 2024
+    },
+    "ES": {
+      "gPerKwh": 153.6,
+      "year": 2025
+    },
+    "ET": {
+      "gPerKwh": 23.08,
+      "year": 2025
+    },
+    "FI": {
+      "gPerKwh": 57.47,
+      "year": 2025
+    },
+    "FJ": {
+      "gPerKwh": 278.26,
+      "year": 2024
+    },
+    "FK": {
+      "gPerKwh": 1000,
+      "year": 2023
+    },
+    "FO": {
+      "gPerKwh": 346.94,
+      "year": 2023
+    },
+    "FR": {
+      "gPerKwh": 41.44,
+      "year": 2025
+    },
+    "GA": {
+      "gPerKwh": 523.08,
+      "year": 2024
+    },
+    "GB": {
+      "gPerKwh": 217.41,
+      "year": 2025
+    },
+    "GD": {
+      "gPerKwh": 666.67,
+      "year": 2024
+    },
+    "GE": {
+      "gPerKwh": 145.93,
+      "year": 2025
+    },
+    "GF": {
+      "gPerKwh": 244.9,
+      "year": 2023
+    },
+    "GH": {
+      "gPerKwh": 468.89,
+      "year": 2024
+    },
+    "GI": {
+      "gPerKwh": 590.91,
+      "year": 2024
+    },
+    "GL": {
+      "gPerKwh": 150,
+      "year": 2024
+    },
+    "GM": {
+      "gPerKwh": 666.67,
+      "year": 2024
+    },
+    "GN": {
+      "gPerKwh": 181.14,
+      "year": 2024
+    },
+    "GP": {
+      "gPerKwh": 497.01,
+      "year": 2023
+    },
+    "GQ": {
+      "gPerKwh": 644.3,
+      "year": 2024
+    },
+    "GR": {
+      "gPerKwh": 315.09,
+      "year": 2025
+    },
+    "GT": {
+      "gPerKwh": 301.46,
+      "year": 2024
+    },
+    "GU": {
+      "gPerKwh": 607.53,
+      "year": 2024
+    },
+    "GW": {
+      "gPerKwh": 625,
+      "year": 2024
+    },
+    "GY": {
+      "gPerKwh": 644.93,
+      "year": 2024
+    },
+    "HK": {
+      "gPerKwh": 675.48,
+      "year": 2024
+    },
+    "HN": {
+      "gPerKwh": 322.12,
+      "year": 2024
+    },
+    "HR": {
+      "gPerKwh": 158.5,
+      "year": 2025
+    },
+    "HT": {
+      "gPerKwh": 534.88,
+      "year": 2024
+    },
+    "HU": {
+      "gPerKwh": 163.02,
+      "year": 2025
+    },
+    "ID": {
+      "gPerKwh": 680.25,
+      "year": 2024
+    },
+    "IE": {
+      "gPerKwh": 256.54,
+      "year": 2025
+    },
+    "IL": {
+      "gPerKwh": 492.69,
+      "year": 2025
+    },
+    "IN": {
+      "gPerKwh": 670.13,
+      "year": 2025
+    },
+    "IQ": {
+      "gPerKwh": 683.1,
+      "year": 2024
+    },
+    "IR": {
+      "gPerKwh": 659.53,
+      "year": 2025
+    },
+    "IS": {
+      "gPerKwh": 27.82,
+      "year": 2024
+    },
+    "IT": {
+      "gPerKwh": 284.78,
+      "year": 2025
+    },
+    "JM": {
+      "gPerKwh": 563.01,
+      "year": 2024
+    },
+    "JO": {
+      "gPerKwh": 529.79,
+      "year": 2024
+    },
+    "JP": {
+      "gPerKwh": 477.26,
+      "year": 2025
+    },
+    "KE": {
+      "gPerKwh": 95.44,
+      "year": 2025
+    },
+    "KG": {
+      "gPerKwh": 152.73,
+      "year": 2025
+    },
+    "KH": {
+      "gPerKwh": 498.87,
+      "year": 2025
+    },
+    "KI": {
+      "gPerKwh": 500,
+      "year": 2024
+    },
+    "KM": {
+      "gPerKwh": 642.86,
+      "year": 2023
+    },
+    "KN": {
+      "gPerKwh": 608.7,
+      "year": 2024
+    },
+    "KP": {
+      "gPerKwh": 340.59,
+      "year": 2024
+    },
+    "KR": {
+      "gPerKwh": 417.06,
+      "year": 2025
+    },
+    "KW": {
+      "gPerKwh": 635.31,
+      "year": 2025
+    },
+    "KY": {
+      "gPerKwh": 633.8,
+      "year": 2024
+    },
+    "KZ": {
+      "gPerKwh": 805.32,
+      "year": 2025
+    },
+    "LA": {
+      "gPerKwh": 232.08,
+      "year": 2024
+    },
+    "LB": {
+      "gPerKwh": 389.51,
+      "year": 2024
+    },
+    "LC": {
+      "gPerKwh": 650,
+      "year": 2024
+    },
+    "LK": {
+      "gPerKwh": 329.28,
+      "year": 2025
+    },
+    "LR": {
+      "gPerKwh": 315.79,
+      "year": 2024
+    },
+    "LS": {
+      "gPerKwh": 20.83,
+      "year": 2022
+    },
+    "LT": {
+      "gPerKwh": 138.36,
+      "year": 2025
+    },
+    "LU": {
+      "gPerKwh": 123.38,
+      "year": 2025
+    },
+    "LV": {
+      "gPerKwh": 138.76,
+      "year": 2025
+    },
+    "LY": {
+      "gPerKwh": 826.83,
+      "year": 2024
+    },
+    "MA": {
+      "gPerKwh": 596.4,
+      "year": 2025
+    },
+    "MD": {
+      "gPerKwh": 633.12,
+      "year": 2025
+    },
+    "ME": {
+      "gPerKwh": 264.23,
+      "year": 2025
+    },
+    "MG": {
+      "gPerKwh": 432.1,
+      "year": 2024
+    },
+    "MK": {
+      "gPerKwh": 441.35,
+      "year": 2025
+    },
+    "ML": {
+      "gPerKwh": 538.59,
+      "year": 2024
+    },
+    "MM": {
+      "gPerKwh": 502.99,
+      "year": 2024
+    },
+    "MN": {
+      "gPerKwh": 816.31,
+      "year": 2025
+    },
+    "MO": {
+      "gPerKwh": 474.36,
+      "year": 2024
+    },
+    "MQ": {
+      "gPerKwh": 529.8,
+      "year": 2023
+    },
+    "MR": {
+      "gPerKwh": 512.08,
+      "year": 2024
+    },
+    "MS": {
+      "gPerKwh": 1000,
+      "year": 2024
+    },
+    "MT": {
+      "gPerKwh": 484.02,
+      "year": 2025
+    },
+    "MU": {
+      "gPerKwh": 642.23,
+      "year": 2024
+    },
+    "MV": {
+      "gPerKwh": 611.77,
+      "year": 2024
+    },
+    "MW": {
+      "gPerKwh": 54.65,
+      "year": 2024
+    },
+    "MX": {
+      "gPerKwh": 474.02,
+      "year": 2025
+    },
+    "MY": {
+      "gPerKwh": 601.97,
+      "year": 2025
+    },
+    "MZ": {
+      "gPerKwh": 129.36,
+      "year": 2024
+    },
+    "NA": {
+      "gPerKwh": 48.78,
+      "year": 2024
+    },
+    "NC": {
+      "gPerKwh": 560.9,
+      "year": 2024
+    },
+    "NE": {
+      "gPerKwh": 673.68,
+      "year": 2024
+    },
+    "NG": {
+      "gPerKwh": 455.71,
+      "year": 2025
+    },
+    "NI": {
+      "gPerKwh": 300.89,
+      "year": 2024
+    },
+    "NL": {
+      "gPerKwh": 253.56,
+      "year": 2025
+    },
+    "NO": {
+      "gPerKwh": 28.11,
+      "year": 2025
+    },
+    "NP": {
+      "gPerKwh": 24.26,
+      "year": 2024
+    },
+    "NR": {
+      "gPerKwh": 600,
+      "year": 2024
+    },
+    "NZ": {
+      "gPerKwh": 92.76,
+      "year": 2025
+    },
+    "OM": {
+      "gPerKwh": 544.47,
+      "year": 2025
+    },
+    "PA": {
+      "gPerKwh": 221.15,
+      "year": 2024
+    },
+    "PE": {
+      "gPerKwh": 238.25,
+      "year": 2025
+    },
+    "PF": {
+      "gPerKwh": 430.56,
+      "year": 2024
+    },
+    "PG": {
+      "gPerKwh": 513.74,
+      "year": 2024
+    },
+    "PH": {
+      "gPerKwh": 588.29,
+      "year": 2025
+    },
+    "PK": {
+      "gPerKwh": 346.56,
+      "year": 2025
+    },
+    "PL": {
+      "gPerKwh": 588.6,
+      "year": 2025
+    },
+    "PM": {
+      "gPerKwh": 600,
+      "year": 2023
+    },
+    "PR": {
+      "gPerKwh": 654.66,
+      "year": 2025
+    },
+    "PS": {
+      "gPerKwh": 414.14,
+      "year": 2024
+    },
+    "PT": {
+      "gPerKwh": 127.91,
+      "year": 2025
+    },
+    "PY": {
+      "gPerKwh": 24.7,
+      "year": 2025
+    },
+    "QA": {
+      "gPerKwh": 581.52,
+      "year": 2025
+    },
+    "RE": {
+      "gPerKwh": 394.14,
+      "year": 2023
+    },
+    "RO": {
+      "gPerKwh": 250.75,
+      "year": 2025
+    },
+    "RS": {
+      "gPerKwh": 695.8,
+      "year": 2025
+    },
+    "RU": {
+      "gPerKwh": 449.73,
+      "year": 2025
+    },
+    "RW": {
+      "gPerKwh": 353.98,
+      "year": 2024
+    },
+    "SA": {
+      "gPerKwh": 691.95,
+      "year": 2024
+    },
+    "SB": {
+      "gPerKwh": 636.36,
+      "year": 2024
+    },
+    "SC": {
+      "gPerKwh": 555.56,
+      "year": 2024
+    },
+    "SD": {
+      "gPerKwh": 153.69,
+      "year": 2024
+    },
+    "SE": {
+      "gPerKwh": 35.26,
+      "year": 2025
+    },
+    "SG": {
+      "gPerKwh": 497.09,
+      "year": 2025
+    },
+    "SH": {
+      "gPerKwh": 1000,
+      "year": 2023
+    },
+    "SI": {
+      "gPerKwh": 183.29,
+      "year": 2025
+    },
+    "SK": {
+      "gPerKwh": 94.85,
+      "year": 2025
+    },
+    "SL": {
+      "gPerKwh": 47.62,
+      "year": 2024
+    },
+    "SN": {
+      "gPerKwh": 539.97,
+      "year": 2024
+    },
+    "SO": {
+      "gPerKwh": 511.63,
+      "year": 2024
+    },
+    "SR": {
+      "gPerKwh": 321.84,
+      "year": 2024
+    },
+    "SS": {
+      "gPerKwh": 642.86,
+      "year": 2024
+    },
+    "ST": {
+      "gPerKwh": 555.56,
+      "year": 2023
+    },
+    "SV": {
+      "gPerKwh": 139.32,
+      "year": 2025
+    },
+    "SY": {
+      "gPerKwh": 706.19,
+      "year": 2024
+    },
+    "SZ": {
+      "gPerKwh": 131.15,
+      "year": 2024
+    },
+    "TC": {
+      "gPerKwh": 629.63,
+      "year": 2024
+    },
+    "TD": {
+      "gPerKwh": 621.62,
+      "year": 2024
+    },
+    "TG": {
+      "gPerKwh": 422.54,
+      "year": 2024
+    },
+    "TH": {
+      "gPerKwh": 545.74,
+      "year": 2025
+    },
+    "TJ": {
+      "gPerKwh": 72.56,
+      "year": 2025
+    },
+    "TL": {
+      "gPerKwh": 666.67,
+      "year": 2024
+    },
+    "TM": {
+      "gPerKwh": 1306.27,
+      "year": 2024
+    },
+    "TN": {
+      "gPerKwh": 560.29,
+      "year": 2025
+    },
+    "TO": {
+      "gPerKwh": 571.43,
+      "year": 2024
+    },
+    "TR": {
+      "gPerKwh": 474.74,
+      "year": 2025
+    },
+    "TT": {
+      "gPerKwh": 681.68,
+      "year": 2024
+    },
+    "TW": {
+      "gPerKwh": 633.21,
+      "year": 2025
+    },
+    "TZ": {
+      "gPerKwh": 345.02,
+      "year": 2024
+    },
+    "UA": {
+      "gPerKwh": 250.47,
+      "year": 2022
+    },
+    "UG": {
+      "gPerKwh": 58.52,
+      "year": 2024
+    },
+    "US": {
+      "gPerKwh": 384.4,
+      "year": 2025
+    },
+    "UY": {
+      "gPerKwh": 80.4,
+      "year": 2025
+    },
+    "UZ": {
+      "gPerKwh": 1000,
+      "year": 2025
+    },
+    "VC": {
+      "gPerKwh": 600,
+      "year": 2024
+    },
+    "VE": {
+      "gPerKwh": 85.86,
+      "year": 2024
+    },
+    "VG": {
+      "gPerKwh": 647.06,
+      "year": 2023
+    },
+    "VI": {
+      "gPerKwh": 632.35,
+      "year": 2023
+    },
+    "VN": {
+      "gPerKwh": 460.73,
+      "year": 2025
+    },
+    "VU": {
+      "gPerKwh": 500,
+      "year": 2023
+    },
+    "WS": {
+      "gPerKwh": 375,
+      "year": 2024
+    },
+    "YE": {
+      "gPerKwh": 592.38,
+      "year": 2024
+    },
+    "ZA": {
+      "gPerKwh": 699.29,
+      "year": 2025
+    },
+    "ZM": {
+      "gPerKwh": 119.68,
+      "year": 2024
+    },
+    "ZW": {
+      "gPerKwh": 384.02,
+      "year": 2024
+    }
+  }
+}
