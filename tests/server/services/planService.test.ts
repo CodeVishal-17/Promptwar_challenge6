@@ -36,7 +36,9 @@ const failing = (err: unknown): GeminiClient => ({ generateJson: () => Promise.r
 const aiResponse = (over: Record<string, unknown> = {}) => ({
   summary: 'Air is poor today, so keep trips short.',
   items: [
-    ...[...idsIn('routine')].reverse().map((actionId) => ({ actionId, why: 'Because it helps you.' })),
+    ...[...idsIn('routine')]
+      .reverse()
+      .map((actionId) => ({ actionId, why: 'Because it helps you.' })),
     ...idsIn('indoor').map((actionId) => ({ actionId, why: 'Cleaner air at home.' })),
     ...idsIn('sustainable').map((actionId) => ({ actionId, why: 'Better for everyone.' })),
   ],
@@ -120,7 +122,9 @@ describe('makePlan', () => {
     const find = (p: Awaited<ReturnType<typeof makePlan>>) =>
       [...p.routine, ...p.indoor, ...p.sustainable].find((i) => i.actionId === timed.action.id)!;
     const bad = await makePlan(ctx, {
-      gemini: fake(aiResponse({ items: [{ actionId: timed.action.id, why: 'ok', time: '25:99' }] })),
+      gemini: fake(
+        aiResponse({ items: [{ actionId: timed.action.id, why: 'ok', time: '25:99' }] }),
+      ),
       now: clock,
     });
     expect(find(bad).time).toBe(timed.suggestedTime);
@@ -138,7 +142,9 @@ describe('makePlan', () => {
   it('ignores an AI time on a candidate that has no suggested time', async () => {
     const untimed = cands.find((c) => c.suggestedTime === undefined)!;
     const plan = await makePlan(ctx, {
-      gemini: fake(aiResponse({ items: [{ actionId: untimed.action.id, why: 'ok', time: '12:00' }] })),
+      gemini: fake(
+        aiResponse({ items: [{ actionId: untimed.action.id, why: 'ok', time: '12:00' }] }),
+      ),
       now: clock,
     });
     const item = [...plan.routine, ...plan.indoor, ...plan.sustainable].find(
@@ -178,7 +184,15 @@ describe('makePlan', () => {
     await makePlan(ctx, { gemini: client, now: clock });
     const { user, system } = client.calls[0]!;
     expect(user).toContain('sensitiveGroups');
-    for (const raw of ['"respiratory":', '"pregnant":', '"children":', '"lat"', '"lon"', 'pm25', 'timezone']) {
+    for (const raw of [
+      '"respiratory":',
+      '"pregnant":',
+      '"children":',
+      '"lat"',
+      '"lon"',
+      'pm25',
+      'timezone',
+    ]) {
       expect(user).not.toContain(raw);
     }
     expect(user).toMatch(/<context>[\s\S]*<\/context>/);

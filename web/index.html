@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f5f7f9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e1419" media="(prefers-color-scheme: dark)" />
+    <meta
+      name="description"
+      content="Live air quality for any city, with a low-emission plan for your household."
+    />
+    <title>Clearday — air quality and a cleaner day</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <header class="site-header">
+      <div class="container site-header__inner">
+        <a class="brand" href="/">
+          <svg
+            class="brand__mark"
+            viewBox="0 0 32 32"
+            width="28"
+            height="28"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <circle class="brand__sun" cx="16" cy="12.5" r="6.5" />
+            <path
+              class="brand__breeze"
+              d="M4 20.5c2.8 0 4.2-1.8 7.2-1.8s4.4 1.8 7.2 1.8 4.4-1.8 7.2-1.8c.8 0 1.6.1 2.4.4"
+            />
+            <path
+              class="brand__breeze"
+              d="M8 26c2.2 0 3.4-1.5 5.8-1.5S17.2 26 19.4 26s3.4-1.5 4.6-1.5"
+            />
+          </svg>
+          <span class="brand__name">Clearday</span>
+        </a>
+        <p class="site-header__tagline">Air quality, made actionable</p>
+      </div>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <div class="container page">
+        <section class="intro" aria-labelledby="page-title">
+          <h1 id="page-title" class="intro__title">How’s the air today?</h1>
+          <p class="intro__lede">
+            Live air quality for any city, and a plan to help your household breathe cleaner air and
+            cut emissions.
+          </p>
+          <div id="location-search" class="intro__search"></div>
+          <noscript>
+            <p class="notice notice--plain">
+              Clearday needs JavaScript to fetch live air quality. Please turn it on and reload the
+              page.
+            </p>
+          </noscript>
+        </section>
+
+        <section id="now" class="section" aria-labelledby="now-title">
+          <h2 id="now-title" class="section__title" tabindex="-1">Air right now</h2>
+          <div id="now-body" class="section__body">
+            <div class="card empty-state">
+              <svg
+                class="icon empty-state__icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" />
+                <path d="M12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+              </svg>
+              <p class="empty-state__title">Choose a place to begin</p>
+              <p class="empty-state__text">
+                Search for your city, or use your location, to see the live US Air Quality Index
+                where you are.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="forecast" class="section" aria-labelledby="forecast-title" hidden>
+          <h2 id="forecast-title" class="section__title">Next 48 hours</h2>
+          <div id="forecast-body" class="section__body"></div>
+        </section>
+
+        <section id="plan" class="section" aria-labelledby="plan-title" hidden>
+          <h2 id="plan-title" class="section__title">Your plan for today</h2>
+          <div id="plan-body" class="section__body"></div>
+        </section>
+
+        <section id="ask" class="section" aria-labelledby="ask-title" hidden>
+          <h2 id="ask-title" class="section__title">Ask about today’s air</h2>
+          <div id="ask-body" class="section__body"></div>
+        </section>
+
+        <section id="method" class="section" aria-labelledby="method-title">
+          <h2 id="method-title" class="section__title">How we calculate</h2>
+          <div id="method-body" class="section__body prose">
+            <p>
+              Clearday computes the US EPA Air Quality Index, using the 2024 PM2.5 breakpoints, from
+              the Copernicus Atmosphere Monitoring Service (CAMS) forecasts served by Open-Meteo.
+              These are modelled estimates for an area roughly 11–40 km across, not readings from a
+              monitor on your street.
+            </p>
+          </div>
+        </section>
+
+        <div id="status" class="visually-hidden" role="status" aria-live="polite"></div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container site-footer__inner">
+        <p>
+          Air-quality data from
+          <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer"
+            >Open-Meteo<span class="visually-hidden"> (opens in new tab)</span></a
+          >
+          (CC BY 4.0), based on forecasts from the Copernicus Atmosphere Monitoring Service (<a
+            href="https://atmosphere.copernicus.eu/"
+            target="_blank"
+            rel="noopener noreferrer"
+            >CAMS<span class="visually-hidden"> (opens in new tab)</span></a
+          >).
+        </p>
+        <p>
+          <strong>Not medical advice.</strong> If you have symptoms or a health condition, follow
+          your clinician’s guidance.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

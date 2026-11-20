@@ -1,0 +1,138 @@
+/*
+ * Clearday design tokens. Calm neutrals carry the interface; the six EPA AQI colours are the only
+ * strong colours, and they appear only as swatches and bands — never as text or behind text.
+ *
+ * Contrast (WCAG 2.2, checked with the relative-luminance formula):
+ *   light  text 16.5:1 on surface · muted 7.1:1 · link 7.3:1 · border-strong 3.5:1 · focus 7.3:1
+ *   dark   text 14.3:1 on surface · muted 7.3:1 · link 8.7:1 · border-strong 3.4:1 · focus 8.7:1
+ * Every text pair is at least 5.9:1 on every surface it can sit on (bg, surface, sunken, accent-soft).
+ */
+:root {
+  color-scheme: light dark;
+
+  /* Neutrals — light */
+  --color-bg: #f5f7f9;
+  --color-surface: #ffffff;
+  --color-sunken: #eef2f5;
+  --color-border: #dce2e8;
+  --color-border-strong: #7d8b99;
+  --color-text: #14202b;
+  --color-text-muted: #4c5a68;
+  --color-accent: #1d5a8c;
+  --color-accent-soft: #e7eff7;
+  --color-danger: #a4332a;
+  --color-focus: #1d5a8c;
+  --color-on-inverse: #ffffff;
+  --color-skeleton: #e6ebf0;
+  --color-skeleton-shine: #f3f6f8;
+  --color-swatch-ring: rgb(20 32 43 / 0.18);
+
+  /* EPA AQI category colours (US EPA Technical Assistance Document, 2024). Swatches and bands only. */
+  --aqi-good: #00e400;
+  --aqi-moderate: #ffff00;
+  --aqi-usg: #ff7e00;
+  --aqi-unhealthy: #ff0000;
+  --aqi-very-unhealthy: #8f3f97;
+  --aqi-hazardous: #7e0023;
+  --aqi-none: #b5c0ca;
+
+  /* Type: system fonts only (the CSP allows no font hosts), on a 1.2 ratio scale. */
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, sans-serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.3125rem;
+  --text-2xl: 1.625rem;
+  --text-3xl: clamp(1.875rem, 1.4rem + 2.2vw, 2.5rem);
+  --text-display: clamp(4rem, 2.6rem + 7vw, 6rem);
+  --leading-tight: 1.1;
+  --leading-snug: 1.3;
+  --leading-normal: 1.55;
+  --weight-regular: 400;
+  --weight-medium: 550;
+  --weight-semibold: 620;
+  --weight-bold: 700;
+  --tracking-tight: -0.02em;
+  --tracking-caps: 0.06em;
+
+  /* Spacing: a 4 px base. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --gutter: clamp(1rem, 0.6rem + 2vw, 2rem);
+  --measure: 44rem;
+
+  /* Shape and depth */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgb(20 32 43 / 0.06), 0 1px 1px rgb(20 32 43 / 0.04);
+  --shadow-md: 0 4px 12px rgb(20 32 43 / 0.08), 0 1px 3px rgb(20 32 43 / 0.06);
+  --shadow-lg: 0 12px 32px rgb(20 32 43 / 0.12), 0 2px 6px rgb(20 32 43 / 0.06);
+
+  /* Interaction */
+  --target-min: 2.75rem; /* 44 px: above the 24 px WCAG 2.2 minimum */
+  --focus-ring: 3px solid var(--color-focus);
+  --focus-offset: 2px;
+  --duration-fast: 120ms;
+  --duration: 200ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0e1419;
+    --color-surface: #151d24;
+    --color-sunken: #1b252e;
+    --color-border: #26323d;
+    --color-border-strong: #61717f;
+    --color-text: #e6ecf1;
+    --color-text-muted: #9dabb8;
+    --color-accent: #8dbdf0;
+    --color-accent-soft: #1d2e3f;
+    --color-danger: #f0928a;
+    --color-focus: #8dbdf0;
+    --color-on-inverse: #0e1419;
+    --color-skeleton: #1d2730;
+    --color-skeleton-shine: #26313b;
+    --color-swatch-ring: rgb(230 236 241 / 0.28);
+    --aqi-none: #4a5864;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 14px rgb(0 0 0 / 0.45), 0 1px 3px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 14px 36px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.35);
+  }
+}
+
+/* Maps a category name on any element to its EPA colour, for swatches and bands. */
+[data-category='good'] {
+  --aqi-color: var(--aqi-good);
+}
+[data-category='moderate'] {
+  --aqi-color: var(--aqi-moderate);
+}
+[data-category='usg'] {
+  --aqi-color: var(--aqi-usg);
+}
+[data-category='unhealthy'] {
+  --aqi-color: var(--aqi-unhealthy);
+}
+[data-category='very_unhealthy'] {
+  --aqi-color: var(--aqi-very-unhealthy);
+}
+[data-category='hazardous'] {
+  --aqi-color: var(--aqi-hazardous);
+}
+[data-category='none'] {
+  --aqi-color: var(--aqi-none);
+}
