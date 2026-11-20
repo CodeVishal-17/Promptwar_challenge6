@@ -36,6 +36,10 @@ describe('subIndex', () => {
   it('handles NO2 (ppb)', () => {
     expect(subIndex('no2_1h', 75)).toBe(73);
   });
+  it('truncates rather than rounds just below a boundary', () => {
+    expect(subIndex('pm2_5_24h', 9.0999)).toBe(50);
+    expect(subIndex('o3_8h', 0.0549999)).toBe(50);
+  });
   it('returns null for negative or non-finite input', () => {
     expect(subIndex('pm2_5_24h', -1)).toBeNull();
     expect(subIndex('pm2_5_24h', Number.NaN)).toBeNull();
@@ -87,6 +91,49 @@ describe('computeHourlyAqi', () => {
     expect(r?.category).toBe('usg');
     expect(r?.time).toBe(time[23]);
     expect(r?.perPollutant.pm2_5).toBe(102);
+  });
+  describe('dominant pollutant selection', () => {
+    const base = (): HourlyConcentrations => ({
+      time,
+      pm2_5: series(5),
+      pm10: series(10),
+      o3: series(40),
+      no2: series(10),
+    });
+
+    it('picks NO2 when it dominates, converting ug/m3 to ppb first', () => {
+      const s = base();
+      s.no2[23] = 141.2; // about 75 ppb
+      const r = computeHourlyAqi(s, 23);
+      expect(r?.dominant).toBe('no2');
+      expect(r?.aqi).toBe(73);
+      expect(r?.perPollutant.no2).toBe(73);
+    });
+    it('picks O3 when the 1-hour value exceeds the 8-hour value', () => {
+      const s = base();
+      s.o3[23] = 300; // about 0.153 ppm for one hour, 8-hour mean stays low
+      const r = computeHourlyAqi(s, 23);
+      expect(r?.dominant).toBe('o3');
+      expect(r?.aqi).toBe(135);
+      expect(r?.category).toBe('usg');
+    });
+    it('resolves a tie in the order pm2_5, pm10, o3, no2', () => {
+      const s = base();
+      s.pm2_5 = series(9.0); // sub-index 50
+      s.pm10 = series(54); // sub-index 50
+      s.o3 = series(null);
+      s.no2 = series(null);
+      const r = computeHourlyAqi(s, 23);
+      expect(r?.perPollutant).toEqual({ pm2_5: 50, pm10: 50 });
+      expect(r?.dominant).toBe('pm2_5');
+    });
+    it('skips the 8-hour ozone mean with only 5 of 8 valid hours but still uses the 1-hour value', () => {
+      const s = base();
+      s.o3 = series(40).map((v, h) => (h >= 16 && h <= 18 ? null : v));
+      expect(computeHourlyAqi(s, 23)?.perPollutant.o3).toBeUndefined();
+      s.o3[23] = 300;
+      expect(computeHourlyAqi(s, 23)?.perPollutant.o3).toBe(135);
+    });
   });
   it('returns null for an all-null series', () => {
     const s: HourlyConcentrations = {
