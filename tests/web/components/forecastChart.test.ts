@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { AirReport, AqiReading } from '../../../shared/types.js';
-import { chartBars, renderForecast } from '../../../web/src/components/forecastChart.js';
+import { chartBars, gridLines, renderForecast } from '../../../web/src/components/forecastChart.js';
 import { makeReport } from '../helpers.js';
 
 function nth<T>(list: ArrayLike<T>, i: number): T {
@@ -83,6 +83,25 @@ describe('chartBars', () => {
   });
 });
 
+describe('gridLines', () => {
+  it('labels every category boundary up to 200 on an everyday scale', () => {
+    expect(gridLines(200)).toEqual([50, 100, 150, 200]);
+    expect(gridLines(238)).toEqual([50, 100, 150, 200]);
+  });
+
+  it('drops boundaries that would sit too close to label on a hazardous scale', () => {
+    expect(gridLines(500)).toEqual([100, 200, 300, 500]);
+    expect(gridLines(1047)).toEqual([150, 300, 500, 1000]);
+  });
+
+  it('never puts two lines closer than 12% of the scale', () => {
+    for (let top = 200; top <= 2000; top += 37) {
+      const lines = gridLines(top);
+      lines.forEach((v, i) => expect((v - (lines[i - 1] ?? 0)) / top).toBeGreaterThanOrEqual(0.12));
+    }
+  });
+});
+
 describe('renderForecast', () => {
   let el: HTMLElement;
   beforeEach(() => {
@@ -96,7 +115,7 @@ describe('renderForecast', () => {
     expect(svg?.getAttribute('role')).toBe('img');
     expect(svg?.getAttribute('viewBox')).toBeTruthy();
     expect(svg?.getAttribute('aria-label')).toContain(
-      'Cleanest air 16:00–18:00, worst 20:00–22:00',
+      'Cleanest air Fri 16:00–18:00, worst Sat 20:00–22:00',
     );
     expect(svg?.hasAttribute('style')).toBe(false);
   });
@@ -123,6 +142,19 @@ describe('renderForecast', () => {
         expect(n.closest('[aria-hidden="true"]')).not.toBeNull();
       }
     }
+  });
+
+  it('widens the label column when the scale runs past 1000 (the AQI has no cap at 500)', () => {
+    const smoggy = hourly().map((r, i) => (r && i === 10 ? { ...r, aqi: 1047 } : r));
+    renderForecast(el, report({ hourly: smoggy }));
+    const labels = [...el.querySelectorAll('.chart__axis-label')].map((n) => n.textContent);
+    expect(labels).toEqual(['150', '300', '500', '1000']);
+    expect(el.querySelector('.chart-wrap')?.classList.contains('chart-wrap--wide-axis')).toBe(true);
+
+    renderForecast(el, report());
+    expect(el.querySelector('.chart-wrap')?.classList.contains('chart-wrap--wide-axis')).toBe(
+      false,
+    );
   });
 
   it('keeps every tick label inside the chart whatever the start hour', () => {
@@ -152,9 +184,9 @@ describe('renderForecast', () => {
     expect(labels).toEqual(['Cleanest', 'Worst']);
     const summary = el.querySelector('.forecast__windows')?.textContent ?? '';
     expect(summary).toContain('Cleanest air');
-    expect(summary).toContain('16:00–18:00');
+    expect(summary).toContain('Fri 16:00–18:00');
     expect(summary).toContain('Worst');
-    expect(summary).toContain('20:00–22:00');
+    expect(summary).toContain('Sat 20:00–22:00');
   });
 
   it('puts window labels at the window centre, stacking them when they would collide', () => {

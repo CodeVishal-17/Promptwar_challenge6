@@ -696,6 +696,11 @@
   --pad-top: 3.25rem;
 }
 
+/* Room for a four-digit axis label (the AQI runs past 500 in the worst smog). */
+.chart-wrap--wide-axis {
+  --pad-left: 2.75rem;
+}
+
 @media (min-width: 40rem) {
   .chart-wrap {
     --plot-h: 14rem;

@@ -98,7 +98,12 @@ function svg<K extends keyof SVGElementTagNameMap>(
 // carries no text: every label is HTML, positioned by percentage, and stays at a readable size.
 const PLOT_W = 480;
 const PLOT_H = 100;
-const GRID_LINES = [50, 100, 150, 200];
+/** Grid lines sit on the EPA category boundaries, plus 1000 because the AQI runs on past 500. */
+const GRID_LINES = [50, 100, 150, 200, 300, 500, 1000];
+/** Nearest two grid lines may sit, as a share of the scale, so their labels never overlap. */
+const MIN_GRID_GAP = 0.12;
+/** Scale tops from which an axis label has four digits and needs a wider label column. */
+const WIDE_AXIS_FROM = 1000;
 const GAP_MARK_H = 2.5;
 const TICK_EVERY_H = 6;
 /** Labels centred closer than this to an edge (percent of the plot width) anchor to that edge. */
@@ -116,7 +121,9 @@ function weekday(date: string, style: 'long' | 'short'): string {
   return new Intl.DateTimeFormat('en-GB', { weekday: style, timeZone: 'UTC' }).format(d);
 }
 
-const windowRange = (w: AirWindow): string => `${hhmm(w.start)}–${hhmm(w.end)}`;
+/** The window with its weekday: in a 48-hour view, "19:00" alone could be today or tomorrow. */
+const windowRange = (w: AirWindow): string =>
+  `${weekday(w.start.slice(0, 10), 'short')} ${hhmm(w.start)}–${hhmm(w.end)}`;
 const WINDOW_WORD = { best: 'Cleanest air', worst: 'Worst' } as const;
 
 function describe(report: AirReport): string {
@@ -192,6 +199,16 @@ function windowMarks(report: AirReport, times: string[], slot: number): Placed {
   return out;
 }
 
+/** The grid lines for a scale that tops out at `top`: the boundaries that fit, spaced to be labelled. */
+export function gridLines(top: number): number[] {
+  const lines: number[] = [];
+  for (const v of GRID_LINES) {
+    if (v > top) break;
+    if ((v - (lines.at(-1) ?? 0)) / top >= MIN_GRID_GAP) lines.push(v);
+  }
+  return lines;
+}
+
 function buildChart(report: AirReport): HTMLElement {
   const { hourly } = report;
   const times = hourTimes(hourly);
@@ -200,7 +217,7 @@ function buildChart(report: AirReport): HTMLElement {
   const bars = chartBars(hourly, PLOT_W, PLOT_H, top);
   const slot = PLOT_W / hourly.length;
 
-  const gridValues = GRID_LINES.filter((v) => v <= top);
+  const gridValues = gridLines(top);
   const grid = gridValues.map((v) => {
     const y = PLOT_H - (v / top) * PLOT_H;
     return svg('line', { class: 'chart__grid', x1: 0, x2: PLOT_W, y1: y, y2: y });
@@ -270,7 +287,15 @@ function buildChart(report: AirReport): HTMLElement {
 
   return h(
     'div',
-    { class: `chart-wrap${stack.stacked ? ' chart-wrap--stacked' : ''}` },
+    {
+      class: [
+        'chart-wrap',
+        stack.stacked ? 'chart-wrap--stacked' : '',
+        top >= WIDE_AXIS_FROM ? 'chart-wrap--wide-axis' : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
+    },
     h('div', { class: 'chart__plot' }, plot),
     h('div', { class: 'chart__y', 'aria-hidden': 'true' }, ...yLabels),
     h('div', { class: 'chart__x', 'aria-hidden': 'true' }, ...ticks),
