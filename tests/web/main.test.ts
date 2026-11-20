@@ -226,6 +226,73 @@ describe('the plan', () => {
     expect(planBody().textContent).not.toContain('São Paulo plan');
   });
 
+  it('while the next place’s air loads, shows nothing of the previous place’s plan or forecast', async () => {
+    savePlace(PLACE);
+    await boot(deps());
+    expect(section('plan').hidden).toBe(false);
+    expect(section('forecast').hidden).toBe(false);
+
+    searchPlaces.mockResolvedValueOnce([{ ...PLACE, name: 'Lima', countryCode: 'PE', lat: -12 }]);
+    getAir.mockImplementationOnce(() => new Promise(() => {}));
+    await pickFromSearch();
+    await flush();
+
+    expect(nowBody().querySelector('.skeleton')).not.toBeNull();
+    expect(section('plan').hidden).toBe(true);
+    expect(section('forecast').hidden).toBe(true);
+    expect(planBody().childNodes).toHaveLength(0);
+    expect(section('forecast-body').childNodes).toHaveLength(0);
+    expect(document.querySelector('[aria-busy="true"]:not(#now-body)')).toBeNull();
+  });
+
+  it('leaves nothing busy when a plan is pending, the place changes and the new air fails', async () => {
+    savePlace(PLACE);
+    getPlan.mockImplementationOnce(() => new Promise(() => {}));
+    void boot(deps());
+    await flush();
+    await flush();
+    expect(section('plan').getAttribute('aria-busy')).toBe('true');
+
+    searchPlaces.mockResolvedValueOnce([{ ...PLACE, name: 'Lima', countryCode: 'PE', lat: -12 }]);
+    getAir.mockRejectedValueOnce(new ApiError('air_data_unavailable', 502));
+    await pickFromSearch();
+    await flush();
+
+    expect(nowBody().textContent).toMatch(/not responding/);
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+    expect(section('plan').hidden).toBe(true);
+  });
+
+  it('a profile saved while the next place’s air loads is planned only once that air arrives', async () => {
+    savePlace(PLACE);
+    await boot(deps());
+    expect(getPlan).toHaveBeenCalledTimes(1);
+
+    const lima = { ...PLACE, name: 'Lima', countryCode: 'PE', lat: -12 };
+    searchPlaces.mockResolvedValueOnce([lima]);
+    let resolveAir: (r: AirReport) => void = () => {};
+    getAir.mockImplementationOnce(() => new Promise((r) => (resolveAir = r)));
+    await pickFromSearch();
+    await flush();
+
+    byText(document, 'Edit household')?.click();
+    const dialog = document.querySelector('dialog') as HTMLDialogElement;
+    (dialog.querySelector('input[type="number"]') as HTMLInputElement).value = '4';
+    byText(dialog, 'Next')?.click();
+    byText(dialog, 'Next')?.click();
+    byText(dialog, 'Save')?.click();
+    await flush();
+    expect(loadProfile().household.adults).toBe(4);
+    expect(getPlan).toHaveBeenCalledTimes(1);
+    expect(section('plan').hidden).toBe(true);
+
+    resolveAir(makeReport());
+    await flush();
+    expect(getPlan).toHaveBeenCalledTimes(2);
+    expect(getPlan.mock.calls[1]?.[0]).toMatchObject({ lat: -12, countryCode: 'PE' });
+    expect(getPlan.mock.calls[1]?.[0].profile.household.adults).toBe(4);
+  });
+
   it('reuses the cached plan when the place, profile and hour are unchanged', async () => {
     savePlace(PLACE);
     await boot(deps());

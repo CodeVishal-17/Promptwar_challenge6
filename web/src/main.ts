@@ -79,9 +79,11 @@ const planCache = new Map<string, Plan>();
 const PLAN_CACHE_MAX = 20;
 /** Increments on every plan request and place change, so a stale plan is never shown. */
 let planGeneration = 0;
-/** Whether the report behind the current plan had a reading; without one the category is a placeholder. */
-let hasReading = true;
-let currentPlace: Place | null = null;
+/**
+ * The place whose air report is on screen, and whether it had a current reading. Null while a
+ * place's air is loading or has failed, so nothing can plan for a place without its air.
+ */
+let loaded: { place: Place; hasReading: boolean } | null = null;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -102,16 +104,21 @@ function remember(key: string, plan: Plan): void {
 
 /**
  * Fetches and shows the household plan, from memory when the place, profile and hour are
- * unchanged. Never rejects: a failure, or a malformed plan, becomes the plan error with Retry.
+ * unchanged. `hasReading` says whether this place's report had a current reading. Never
+ * rejects: a failure, or a malformed plan, becomes the plan error with Retry.
  */
-export async function requestPlan(place: Place, profile: Profile): Promise<void> {
+export async function requestPlan(
+  place: Place,
+  profile: Profile,
+  { hasReading = true }: { hasReading?: boolean } = {},
+): Promise<void> {
   const mine = ++planGeneration;
   const body = byId('plan-body');
   byId('plan').hidden = false;
   const key = planKey(place, profile);
   const retry = () => {
     byId('plan-title').focus();
-    void requestPlan(place, loadProfile());
+    void requestPlan(place, loadProfile(), { hasReading });
   };
   const fail = (err: unknown) => {
     renderPlanError(body, retry, errorMessage(err, PLAN_ERRORS));
@@ -146,19 +153,22 @@ export async function requestPlan(place: Place, profile: Profile): Promise<void>
   announce('Your plan is ready.');
 }
 
-/** Opens the household form; a saved change is stored and, with a place chosen, re-planned. */
+/**
+ * Opens the household form. A saved change is stored and, once a place's air is on screen,
+ * re-planned; while the air is still loading, that load plans with the saved profile.
+ */
 function editProfile(): void {
   openProfileForm(loadProfile(), (profile) => {
     saveProfile(profile);
-    if (currentPlace) void requestPlan(currentPlace, profile);
+    if (loaded) void requestPlan(loaded.place, profile, { hasReading: loaded.hasReading });
   });
 }
 
 /** First visit: ask about the household once, then plan with whatever they chose. */
-function onboardThenPlan(place: Place): void {
+function onboardThenPlan(place: Place, hasReading: boolean): void {
   const done = (profile: Profile) => {
     markOnboardingSeen();
-    void requestPlan(place, profile);
+    void requestPlan(place, profile, { hasReading });
   };
   openProfileForm(
     loadProfile(),
@@ -175,10 +185,19 @@ function onboardThenPlan(place: Place): void {
 /** Increments on every place change, so a slow answer for an earlier place is dropped. */
 let generation = 0;
 
-/** Hides what belongs to the previous place: its forecast and plan. */
-function hideDependents(): void {
-  byId('forecast').hidden = true;
-  byId('plan').hidden = true;
+/**
+ * Clears what belongs to the previous place — its forecast and plan — and any loading state
+ * they carried, so nothing from one place shows beside another and nothing stays busy.
+ */
+function resetDependents(): void {
+  loaded = null;
+  planGeneration++;
+  for (const id of ['forecast', 'plan']) {
+    const section = byId(id);
+    section.hidden = true;
+    section.removeAttribute('aria-busy');
+    byId(`${id}-body`).replaceChildren();
+  }
 }
 
 /**
@@ -187,14 +206,13 @@ function hideDependents(): void {
  */
 async function showPlace(place: Place): Promise<void> {
   const mine = ++generation;
-  planGeneration++;
-  currentPlace = place;
+  resetDependents();
   const nowBody = byId('now-body');
   document.title = `${place.name} — Clearday`;
   renderAqiSkeleton(nowBody);
 
   const fail = (err: unknown) => {
-    hideDependents();
+    resetDependents();
     const message = errorMessage(err, AIR_ERRORS);
     renderAqiError(nowBody, message, () => {
       byId('now-title').focus();
@@ -224,9 +242,10 @@ async function showPlace(place: Place): Promise<void> {
       ? `Air quality for ${formatPlace(place)}: AQI ${report.now.aqi}, ${CATEGORY_LABEL[report.now.category]}.`
       : `No air-quality reading for ${formatPlace(place)} this hour.`,
   );
-  hasReading = report.now !== null;
-  if (hasSeenOnboarding()) await requestPlan(place, loadProfile());
-  else onboardThenPlan(place);
+  const hasReading = report.now !== null;
+  loaded = { place, hasReading };
+  if (hasSeenOnboarding()) await requestPlan(place, loadProfile(), { hasReading });
+  else onboardThenPlan(place, hasReading);
 }
 
 /**
