@@ -20,12 +20,12 @@ tested TypeScript, never from the model. You can also ask follow-up questions ab
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | GenAI-powered assistant                               | Gemini chooses and orders the day's actions from a pre-filtered catalogue, writes a "why this matters for you" for each one and a day summary, and answers follow-up questions. It returns structured JSON that must match a response schema.                                                                          | `server/src/services/planService.ts`, `askService.ts`, `gemini.ts`, `web/src/components/askPanel.ts`       |
 | helps families and communities                        | The household profile records adults, children under 12, adults over 65, pregnancy, and lung or heart conditions. Sensitive households get extra EPA/AirNow health lines and child-specific actions such as timing the school run. One action asks people to share what they have learned with their street or school. | `web/src/components/profileForm.ts`, `server/src/domain/health.ts`, `server/src/domain/catalog.ts`         |
-| navigate severe winter smog and urban air pollution   | Live US AQI from PM2.5, PM10, ozone and NO₂, a 48-hour bar chart with the cleanest and worst two-hour windows, a table view, and a daily outlook. The AQI is not capped at 500, so very severe smog reads as it really is.                                                                                             | `server/src/domain/aqi.ts`, `report.ts`, `windows.ts`, `web/src/components/aqiCard.ts`, `forecastChart.ts` |
-| low-emission daily routines                           | A "low-emission routine" section: move or re-time exercise to the cleanest window, keep errands out of the smoggiest hours, time the school run, wear an N95/FFP2 outdoors.                                                                                                                                            | `server/src/domain/catalog.ts` (section `routine`), `planner.ts`                                           |
+| navigate severe winter smog and urban air pollution   | Live US AQI from PM2.5, PM10, ozone and NO₂, a 48-hour bar chart with the cleanest daytime and the worst two-hour windows, a table view, and a daily outlook. The AQI is not capped at 500, so very severe smog reads as it really is.                                                                                 | `server/src/domain/aqi.ts`, `report.ts`, `windows.ts`, `web/src/components/aqiCard.ts`, `forecastChart.ts` |
+| low-emission daily routines                           | A "low-emission routine" section: move or re-time exercise to the cleanest window, keep errands out of the smoggiest hours, time the school run from your usual departure hour, wear an N95/FFP2 outdoors. A time on another day says "Tomorrow" or the weekday.                                                       | `server/src/domain/catalog.ts` (section `routine`), `planner.ts`                                           |
 | indoor air quality hacks                              | An "Indoor air" section: keep windows shut while the air is bad, run a purifier, build a box-fan cleaner, set up one clean room, vent while cooking, air out at the cleanest hour.                                                                                                                                     | `catalog.ts` (section `indoor`), `server/src/domain/impact/indoor.ts`                                      |
 | sustainable alternatives                              | A "Greener swaps" section: switch commute mode, never burn waste, cleaner cooking and heating fuels, combine trips, share rides.                                                                                                                                                                                       | `catalog.ts` (section `sustainable`), `server/src/domain/impact/commute.ts`                                |
 | tailored to their location                            | Air, forecast windows and local times are for the chosen coordinates and time zone. The country sets the grid carbon intensity used for electric cars and rail (213 countries plus a world average).                                                                                                                   | `server/src/services/openMeteo.ts`, `server/src/domain/data/gridIntensity.json`                            |
-| and lifestyle                                         | The commute mode and distance, exercise type, time and length, heating and cooking fuel, purifier, windows and indoor smoking decide which of the 25 catalogue actions apply and feed the impact calculators.                                                                                                          | `shared/types.ts` (`Profile`), `catalog.ts` (`applies`, `impact`)                                          |
+| and lifestyle                                         | The commute mode, distance and departure hour, exercise type, time and length, heating and cooking fuel, purifier, windows and indoor smoking decide which of the 25 catalogue actions apply and feed the impact calculators.                                                                                          | `shared/types.ts` (`Profile`), `catalog.ts` (`applies`, `impact`)                                          |
 | clearly explaining the direct impact of their choices | Every item has a plain-language "why". Items with a cited calculation carry an impact chip, such as "≈710 kg CO₂e/yr saved" or "−35% PM2.5 indoors vs outdoors", that opens "How we calculated this" with the formula, each input, each assumption and the sources.                                                    | `server/src/domain/impact/*.ts`, `web/src/components/impactChip.ts`, `planView.ts`                         |
 
 ## Architecture
@@ -60,8 +60,9 @@ screen is computed in code first, and the model may only repeat numbers it was g
 
 - The AQI, the windows, the times and every impact figure are computed in `server/src/domain/`.
 - Gemini only returns action ids and prose. Unknown and duplicate ids are dropped.
-- Item titles, sources and clock times always come from the catalogue and the windows, never
-  from the model.
+- Item titles, sources, clock times and their day labels ("Tomorrow" or a weekday) always come
+  from the catalogue and the windows, never from the model. Gemini is told each time's day and
+  told not to call a time on another day "today".
 - The number guard (`server/src/domain/numberGuard.ts`) checks every sentence Gemini writes
   (each "why", the summary and each Q&A answer). A sentence that contains a number not present
   in the context Gemini was given, or any non-ASCII digit, is discarded. A plan item then falls
@@ -98,12 +99,12 @@ screen is computed in code first, and the model may only repeat numbers it was g
 **Where the impact figures come from.** Each constant sits in the code next to the table, row or
 cell it was taken from.
 
-| Figure                                                                                              | Formula                                                                | Source                                                                                                                                                                                                             |
-| --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Commute CO₂e saved per year (`impact/commute.ts`)                                                   | one-way km × 2 trips × 5 days × 46 weeks × (kg CO₂e/km before − after) | Fuel modes: UK DESNZ GHG Conversion Factors 2026, tailpipe plus well-to-tank. Electric car and rail: DESNZ kWh per km × the country's lifecycle grid intensity from Our World in Data, based on Ember (CC BY 4.0). |
-| % change in PM2.5 inhaled (`impact/exposure.ts`)                                                    | concentration × inhalation rate × minutes, before and after            | US EPA Exposure Factors Handbook 2011, chapter 6, Table 6-2 (mean short-term inhalation rates by age and activity)                                                                                                 |
-| % less indoor PM2.5 with a purifier, and indoors vs outdoors with windows shut (`impact/indoor.ts`) | steady-state mass balance C_in = P·a·C_out / (a + k + CADR/V)          | Xiang et al. 2021 (air exchange 0.53/h, deposition 0.26/h, penetration 0.97); default room and purifier size from the US EPA Guide to Air Cleaners in the Home                                                     |
-| Health advice per AQI category (`health.ts`)                                                        | static table, with extra lines for sensitive groups                    | AirNow, Air Quality Guide for Particle Pollution                                                                                                                                                                   |
+| Figure                                                                                              | Formula                                                                | Source                                                                                                                                                                                                                                                                                                                |
+| --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Commute CO₂e saved per year (`impact/commute.ts`)                                                   | one-way km × 2 trips × 5 days × 46 weeks × (kg CO₂e/km before − after) | Fuel modes: UK DESNZ GHG Conversion Factors 2026, tailpipe plus well-to-tank. Electric car and rail: DESNZ kWh per km × the country's lifecycle grid intensity from Our World in Data, based on Ember (CC BY 4.0). Bus and rail are per passenger-km at UK average occupancy (the DESNZ basis), and the chip says so. |
+| % change in PM2.5 inhaled (`impact/exposure.ts`)                                                    | concentration × inhalation rate × minutes, before and after            | US EPA Exposure Factors Handbook 2011, chapter 6, Table 6-2 (mean short-term inhalation rates by age and activity); used for moving exercise and for timing the school run (child, light effort)                                                                                                                      |
+| % less indoor PM2.5 with a purifier, and indoors vs outdoors with windows shut (`impact/indoor.ts`) | steady-state mass balance C_in = P·a·C_out / (a + k + CADR/V)          | Xiang et al. 2021 (air exchange 0.53/h, deposition 0.26/h, penetration 0.97); default room and purifier size from the US EPA Guide to Air Cleaners in the Home                                                                                                                                                        |
+| Health advice per AQI category (`health.ts`)                                                        | static table, with extra lines for sensitive groups                    | AirNow, Air Quality Guide for Particle Pollution                                                                                                                                                                                                                                                                      |
 
 Actions with no solid cited figure, such as not burning waste or not smoking indoors, explain
 their impact in words only and link to EPA or WHO pages (`server/src/domain/guidanceSources.ts`).
@@ -133,16 +134,19 @@ deploy behind that many proxies.
 - **Upstream data is checked.** Open-Meteo responses are schema-checked and every outbound fetch
   has an 8 s timeout (`server/src/services/openMeteo.ts`).
 - **Errors and logs leak nothing.** Errors map to short JSON codes, and only the error's name is
-  logged, never a stack trace, a profile or a question (`server/src/middleware/errors.ts`).
+  logged, never a stack trace, a profile or a question (`server/src/middleware/errors.ts`). A
+  failed Gemini call logs one `gemini_failed` line with the error's name, so a bad key, quota or
+  model id is visible on the server (`server/src/services/gemini.ts`).
 - **The profile stays in the browser.** It lives in `localStorage` and is never stored on the
   server. Coordinates are rounded to 2 decimals before they leave the browser.
 - **The profile form says what is shared.** A notice explains that the Gemini free tier may use
-  prompts to improve Google products.
+  prompts to improve Google products. The Q&A box says that typed questions are sent to Google
+  Gemini and asks people not to include personal details.
 
 ## Efficiency
 
 - **Small bundle, no framework.** There is no frontend framework, chart library or UI kit. The
-  production JavaScript is 41 kB, about 15.6 kB gzipped, and the CSS is about 6.8 kB gzipped
+  production JavaScript is 42 kB, about 16.0 kB gzipped, and the CSS is about 6.9 kB gzipped
   (`npm run build`). The server has six runtime dependencies.
 - **Caching with request coalescing.** Air reports are cached in memory for 15 minutes per 0.1°
   grid cell and place searches for 24 hours. Concurrent requests for the same key share one
@@ -163,7 +167,9 @@ Clearday targets WCAG 2.2 AA:
 - **Impact chips.** Disclosure buttons with `aria-expanded`; Escape closes the panel.
 - **Live announcements.** A polite live region announces loaded air, plans and answers.
 - **Not colour alone.** The AQI is a number, a text category and a colour. The chart has a text
-  description, labelled cleanest and worst windows, and a data table you can toggle.
+  description, labelled cleanest daytime and worst windows, and a data table you can toggle.
+  Every bar has a neutral outline, so even the pale Good and Moderate bars reach 3:1 against the
+  card (WCAG 1.4.11).
 - **Visible focus and touch targets.** Focus rings are a visible 3 px. Buttons, impact chips and
   form fields are at least 40 px tall, well above the 24 px WCAG 2.2 minimum.
 - **Display preferences.** Light and dark themes follow the system, motion is dropped when the
@@ -183,11 +189,11 @@ Clearday targets WCAG 2.2 AA:
 ## Testing
 
 ```
-npm run test:coverage   # 438 tests in 37 files; 96.5% statements, 98.1% lines, 89.6% branches
+npm run test:coverage   # 478 tests in 37 files; 96.5% statements, 98.2% lines, 89.9% branches
 ```
 
-Vitest runs two projects (`vitest.config.ts`): `server` in Node (245 tests) and `web` in jsdom
-(193 tests). CI fails if line coverage drops below 80%.
+Vitest runs two projects (`vitest.config.ts`): `server` in Node (277 tests) and `web` in jsdom
+(201 tests). CI fails if line coverage drops below 80%.
 
 - **Domain.** The AQI, unit conversion, windows, every impact calculator against hand-checked
   values, health guidance, catalogue filtering, the planner, the number guard and the profile
