@@ -1,4 +1,4 @@
-import type { AirReport, AqiReading, Place } from '../../shared/types.js';
+import type { AirReport, AqiReading, Impact, Place, Plan, PlanItem } from '../../shared/types.js';
 
 export const PLACE: Place = {
   name: 'São Paulo',
@@ -56,3 +56,92 @@ export function resetDom(): void {
 }
 
 export const statusText = (): string => document.getElementById('status')?.textContent ?? '';
+
+/** A purifier impact shaped like the server's, with a typographic minus in `display`. */
+export function makeImpact(overrides: Partial<Impact> = {}): Impact {
+  return {
+    label: 'Run an air purifier in a closed room',
+    value: -79,
+    unit: '%',
+    display: '−79% indoor PM2.5',
+    formula: 'reduction = (CADR ÷ V) ÷ (a + k + CADR ÷ V)',
+    inputs: [
+      { label: 'Outdoor PM2.5', value: '80 µg/m³' },
+      { label: 'Purifier CADR', value: '200 m³/h' },
+    ],
+    assumptions: [
+      'The purifier runs continuously at its rated CADR with doors and windows closed.',
+      'Room volume defaults to 40 m³ when unknown.',
+    ],
+    sources: [
+      {
+        title: 'US EPA, Guide to Air Cleaners in the Home',
+        url: 'https://www.epa.gov/indoor-air-quality-iaq/guide-air-cleaners-home',
+        year: 2026,
+      },
+    ],
+    ...overrides,
+  };
+}
+
+export function makeItem(overrides: Partial<PlanItem> = {}): PlanItem {
+  return {
+    actionId: 'exercise-indoors',
+    section: 'routine',
+    title: 'Move today’s workout indoors',
+    why: 'Indoors you breathe in far less PM2.5.',
+    impact: null,
+    sources: [],
+    ...overrides,
+  };
+}
+
+/** A fallback-style plan for an unhealthy day. */
+export function makePlan(overrides: Partial<Plan> = {}): Plan {
+  return {
+    summary: 'Air quality is unhealthy (AQI 162) right now.',
+    health: {
+      category: 'unhealthy',
+      sensitive: false,
+      headline: 'The air is unhealthy, especially for sensitive people',
+      advice: ['Keep outdoor effort light and take more breaks.'],
+      source: {
+        title: 'Air Quality Guide for Particle Pollution',
+        url: 'https://www.airnow.gov/publications/air-quality-index/air-quality-guide-for-particle-pollution/',
+        year: 2023,
+      },
+    },
+    routine: [
+      makeItem({
+        actionId: 'avoid-worst-window',
+        title: 'Keep errands out of the smoggiest hours',
+        time: '18:00',
+      }),
+      makeItem(),
+      makeItem({
+        actionId: 'move-exercise-to-best-window',
+        title: 'Shift your exercise to the cleanest hours',
+        time: '07:00',
+        impact: makeImpact({ display: '−42% PM2.5 inhaled', value: -42 }),
+      }),
+    ],
+    indoor: [
+      makeItem({
+        actionId: 'run-purifier',
+        section: 'indoor',
+        title: 'Run your air purifier in the room you use most',
+        impact: makeImpact(),
+      }),
+    ],
+    sustainable: [
+      makeItem({
+        actionId: 'combine-trips',
+        section: 'sustainable',
+        title: 'Combine errands into one trip',
+      }),
+    ],
+    aiUsed: false,
+    generatedAt: '2026-11-20T17:07:00.000Z',
+    ...overrides,
+  };
+}

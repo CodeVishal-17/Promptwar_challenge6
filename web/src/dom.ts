@@ -1,3 +1,5 @@
+import type { Source } from '../../shared/types.js';
+
 /** Attribute values for h(): strings are set as-is, `true` adds a bare attribute, `false` omits it. */
 export type Attrs = Record<string, string | boolean | EventListener>;
 
@@ -50,6 +52,20 @@ export function announce(message: string): void {
 /** A visually hidden note for screen readers, e.g. "(opens in new tab)". */
 export const srOnly = (text: string): HTMLSpanElement =>
   h('span', { class: 'visually-hidden' }, text);
+
+/**
+ * A cited source: a safe external link when its URL is https, otherwise plain text, so data
+ * can never smuggle in a `javascript:` or other scheme. The year is added only if the title
+ * lacks it.
+ */
+export function sourceNode(source: Source, attrs: Attrs = {}): HTMLElement {
+  const text = source.title.includes(String(source.year))
+    ? source.title
+    : `${source.title} (${source.year})`;
+  return source.url.startsWith('https:')
+    ? externalLink(source.url, text, attrs)
+    : h('span', attrs, text);
+}
 
 /** A link to another site: new tab, no opener or referrer, and it says so to screen readers. */
 export function externalLink(href: string, text: string, attrs: Attrs = {}): HTMLAnchorElement {
