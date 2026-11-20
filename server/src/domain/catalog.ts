@@ -196,7 +196,11 @@ export const ACTIONS: readonly Action[] = [
       if (!slots) return false;
       const inBestWindow =
         slots.usual >= slots.best && slots.usual < slots.best + windowHours(slots.bestWindow);
-      return !inBestWindow;
+      if (inBestWindow || slots.bestWindow.meanAqi >= AQI_UNHEALTHY) return false;
+      // Only a real improvement is worth recommending, when both readings are known.
+      const before = ctx.report.pm25[slots.usual] ?? null;
+      const after = ctx.report.pm25[slots.best] ?? null;
+      return before === null || after === null || after < before;
     },
     impact: moveExerciseImpact,
     sources: [AIRNOW_PM_GUIDE, EPA_EFH_CH6],

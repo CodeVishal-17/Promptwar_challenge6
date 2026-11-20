@@ -81,6 +81,25 @@ describe('move-exercise-to-best-window', () => {
     const missed = profileWith({ exercise: { type: 'run', hour: 14, minutes: 45 } });
     expect(a.applies(ctx(missed, soonBest))).toBe(true);
   });
+  it('applies only while the best window is below the unhealthy level', () => {
+    const withBest = (aqi: number) =>
+      makeReport({
+        aqiAt: (i) => (i >= 25 && i <= 27 ? aqi : 300),
+        pm25At: (i) => (i >= 25 && i <= 27 ? 30 : 150),
+      });
+    expect(a.applies(ctx(runner, withBest(150)))).toBe(true);
+    expect(a.applies(ctx(runner, withBest(151)))).toBe(false);
+  });
+  it('does not apply when the window is not cleaner than the usual hour', () => {
+    const withUsual = (usualPm: number) =>
+      makeReport({
+        aqiAt: (i) => (i >= 25 && i <= 27 ? 90 : 212),
+        pm25At: (i) => (i >= 25 && i <= 27 ? 30 : i === 16 ? usualPm : 150),
+      });
+    expect(a.applies(ctx(runner, withUsual(29)))).toBe(false);
+    expect(a.applies(ctx(runner, withUsual(30)))).toBe(false);
+    expect(a.applies(ctx(runner, withUsual(31)))).toBe(true);
+  });
   it('compares PM2.5 at the usual hour with the best window at the activity level', () => {
     const rate = INHALATION_M3_PER_MIN.adult.high;
     const expected = exposureChangeImpact(
@@ -150,6 +169,16 @@ describe('indoor actions', () => {
     expect(a.applies(ctx())).toBe(true);
     expect(a.applies(ctx(profileWith({ home: { canOpenWindows: false } })))).toBe(false);
     expect(a.applies(ctx(DEFAULT_PROFILE, { ...smoggyReport(), windows: [] }))).toBe(false);
+  });
+  it('air-out-in-best-window rejects a best window at the unhealthy level', () => {
+    const a = byId('air-out-in-best-window');
+    const withBest = (aqi: number) =>
+      makeReport({
+        aqiAt: (i) => (i >= 25 && i <= 27 ? aqi : 300),
+        pm25At: () => 100,
+      });
+    expect(a.applies(ctx(DEFAULT_PROFILE, withBest(150)))).toBe(true);
+    expect(a.applies(ctx(DEFAULT_PROFILE, withBest(151)))).toBe(false);
   });
   it('run-purifier applies with a purifier and carries its impact', () => {
     const a = byId('run-purifier');
