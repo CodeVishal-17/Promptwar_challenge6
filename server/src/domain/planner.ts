@@ -12,6 +12,7 @@ import {
   clockTime,
   dayLabel,
   reportToday,
+  schoolRunStart,
   type Action,
   type PlanContext,
   windowOf,
@@ -41,6 +42,7 @@ const bestStart = (ctx: PlanContext): string | undefined => windowOf(ctx.report,
 const TIME_RULES: Readonly<Record<string, (ctx: PlanContext) => string | undefined>> = {
   'move-exercise-to-best-window': bestStart,
   'air-out-in-best-window': bestStart,
+  'school-run-timing': schoolRunStart,
 };
 
 /** True when the household includes someone the AQI guidance singles out. */

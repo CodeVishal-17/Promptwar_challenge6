@@ -160,6 +160,51 @@ describe('move-exercise-to-best-window', () => {
   });
 });
 
+describe('school-run-timing uses the departure hour', () => {
+  const a = byId('school-run-timing');
+  const family = (departHour: number) =>
+    profileWith({
+      household: { children: 1 },
+      commute: { mode: 'car_petrol', oneWayKm: 5, departHour },
+    });
+
+  it('compares PM2.5 at the usual departure with the cleanest daytime hours that day', () => {
+    // Smoggy report: next 08:00 is tomorrow; that day's cleanest daytime hours start at 15:00.
+    const c = ctx(family(8));
+    expect(a.applies(c)).toBe(true);
+    const rate = INHALATION_M3_PER_MIN.child.light;
+    const expected = exposureChangeImpact(
+      'Time the school run for the cleanest daytime hours',
+      { conc: 150, rate, minutes: 1 },
+      { conc: 30, rate, minutes: 1 },
+    );
+    const impact = a.impact?.(c);
+    expect(impact?.value).toBe(-80);
+    expect(impact?.display).toBe(expected.display);
+    expect(impact?.inputs).toEqual([
+      { label: 'Before, tomorrow 08:00', value: expected.inputs[0]?.value },
+      { label: 'After, tomorrow 15:00', value: expected.inputs[1]?.value },
+    ]);
+    expect(impact?.assumptions.join(' ')).toMatch(/any trip length/);
+  });
+  it('changes with the departure hour', () => {
+    // At 16:00 the same-day daytime hours (today) are all unhealthy, so there is nothing to time.
+    expect(a.applies(ctx(family(16)))).toBe(false);
+    // Leaving inside the cleanest hours already: nothing to move.
+    expect(a.applies(ctx(family(15)))).toBe(false);
+  });
+  it('does not apply when that day has no cleaner daytime hours', () => {
+    expect(a.applies(ctx(family(8), clean))).toBe(false);
+  });
+  it('does not apply when the cleanest daytime hours are themselves unhealthy', () => {
+    const report = makeReport({
+      aqiAt: (i) => (i >= 25 && i <= 27 ? 160 : 300),
+      pm25At: (i) => (i >= 25 && i <= 27 ? 70 : 200),
+    });
+    expect(a.applies(ctx(family(8), report))).toBe(false);
+  });
+});
+
 describe('exercise and school actions', () => {
   it('exercise-indoors needs AQI of 151 or more and exercise', () => {
     const a = byId('exercise-indoors');

@@ -55,6 +55,10 @@ describe('selectCandidates', () => {
     const air = cands.find((c) => c.action.id === 'air-out-in-best-window');
     expect(air?.suggestedTime).toBe('15:00');
     expect(air?.suggestedDay).toBe('Tomorrow');
+    const school = cands.find((c) => c.action.id === 'school-run-timing');
+    expect(school?.suggestedStart).toBe('2026-11-20T15:00');
+    expect(school?.suggestedDay).toBe('Tomorrow');
+    expect(school?.impact?.unit).toBe('%');
     const sw = cands.find((c) => c.action.id === 'switch-commute');
     expect(sw?.impact?.unit).toBe('kg CO₂e/yr');
     const n95 = cands.find((c) => c.action.id === 'n95-outdoors');
