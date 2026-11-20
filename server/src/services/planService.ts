@@ -10,12 +10,11 @@ import type { GeminiClient } from './gemini.js';
 /** How long to wait for Gemini before using the built-in plan. */
 const PLAN_TIMEOUT_MS = 10_000;
 const MAX_PER_SECTION = 4;
-const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const SYSTEM = `You write a personalised daily air quality plan for a household.
 Pick actions from the given candidates only, by their actionId. Order each section by what matters most for this household.
 For each pick, write a "why" of one or two sentences in the second person that explains the direct impact for this household.
-Set "time" only when the candidate has a suggestedTime, and copy it exactly. Also write a short "summary" of the day.
+Also write a short "summary" of the day.
 ${COMMON_RULES}`;
 
 const RESPONSE_SCHEMA = {
@@ -29,7 +28,6 @@ const RESPONSE_SCHEMA = {
         properties: {
           actionId: { type: Type.STRING },
           why: { type: Type.STRING },
-          time: { type: Type.STRING },
         },
         required: ['actionId', 'why'],
       },
@@ -40,7 +38,7 @@ const RESPONSE_SCHEMA = {
 
 const AiPlan = z.object({
   summary: z.string(),
-  items: z.array(z.object({ actionId: z.string(), why: z.string(), time: z.string().optional() })),
+  items: z.array(z.object({ actionId: z.string(), why: z.string() })),
 });
 
 /**
@@ -81,15 +79,9 @@ export async function makePlan(
     if (list.length >= MAX_PER_SECTION) continue;
     const item = toItem(cand);
     const why = entry.why.trim();
-    const aiTime = entry.time;
-    const time =
-      aiTime && CLOCK_TIME.test(aiTime) && passesNumberGuard(aiTime, allowed)
-        ? aiTime
-        : cand.suggestedTime;
     list.push({
       ...item,
       why: why && passesNumberGuard(why, allowed) ? why : item.why,
-      ...(time !== undefined ? { time } : {}),
     });
   }
 

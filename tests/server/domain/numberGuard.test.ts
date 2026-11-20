@@ -24,4 +24,9 @@ describe('number guard', () => {
   it('does not treat a trailing full stop as part of the number', () => {
     expect(passesNumberGuard('The AQI is 212.', allowed)).toBe(true);
   });
+  it('rejects non-ASCII digits, which the ASCII number pattern cannot see', () => {
+    expect(passesNumberGuard('AQI २३२', allowed)).toBe(false); // Devanagari
+    expect(passesNumberGuard('AQI ٢١٢', allowed)).toBe(false); // Arabic-Indic
+    expect(passesNumberGuard('AQI ２１２', allowed)).toBe(false); // full-width
+  });
 });

@@ -135,6 +135,32 @@ describe('makePlan', () => {
     expect(find(good).time).toBe(timed.suggestedTime);
   });
 
+  it('ignores an AI time on a candidate that has no suggested time', async () => {
+    const untimed = cands.find((c) => c.suggestedTime === undefined)!;
+    const plan = await makePlan(ctx, {
+      gemini: fake(aiResponse({ items: [{ actionId: untimed.action.id, why: 'ok', time: '12:00' }] })),
+      now: clock,
+    });
+    const item = [...plan.routine, ...plan.indoor, ...plan.sustainable].find(
+      (i) => i.actionId === untimed.action.id,
+    )!;
+    expect(item.time).toBeUndefined();
+  });
+
+  it('ignores an AI time that is valid and passes the guard but differs from the suggested time', async () => {
+    const timed = cands.find((c) => c.suggestedTime !== undefined)!;
+    // 12 comes from the commute distance in the context, so 12:00 passes the guard.
+    const other = timed.suggestedTime === '12:00' ? '13:00' : '12:00';
+    const plan = await makePlan(ctx, {
+      gemini: fake(aiResponse({ items: [{ actionId: timed.action.id, why: 'ok', time: other }] })),
+      now: clock,
+    });
+    const item = [...plan.routine, ...plan.indoor, ...plan.sustainable].find(
+      (i) => i.actionId === timed.action.id,
+    )!;
+    expect(item.time).toBe(timed.suggestedTime);
+  });
+
   it.each([
     ['the client throws', failing(new Error('boom'))],
     ['the client rejects with a timeout', failing(new Error('Gemini request timed out'))],

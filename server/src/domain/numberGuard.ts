@@ -1,3 +1,10 @@
+/**
+ * A cheap guard against invented figures, not a proof of accuracy. It checks that every
+ * ASCII number in a reply also appears in the context. It does NOT check number words
+ * ("twelve"), signs or direction ("down" vs "up"), or which unit or noun a number is
+ * attached to. Non-ASCII digits are rejected outright because the pattern cannot read them.
+ */
+
 /** A run of digits, optionally with `,` or `.` separators between digit groups. */
 const NUMBER = /\d+(?:[.,]\d+)*/g;
 
@@ -13,5 +20,6 @@ export function allowedNumbers(context: string): Set<number> {
 
 /** True when every number in `text` also appears in the context, so the model invented none. */
 export function passesNumberGuard(text: string, allowed: Set<number>): boolean {
+  if (/(?![0-9])\p{Nd}/u.test(text)) return false;
   return numbersIn(text).every((n) => allowed.has(n));
 }
