@@ -1,0 +1,443 @@
+import type {
+  ActivityLevel,
+  AirReport,
+  AirWindow,
+  CommuteMode,
+  Impact,
+  Profile,
+  Section,
+  Source,
+} from '../../../shared/types.js';
+import {
+  AIRNOW_PM_GUIDE,
+  EPA_DIY_AIR_CLEANERS,
+  EPA_IMPROVING_IAQ,
+  EPA_INTRO_IAQ,
+  EPA_WILDFIRES_IAQ,
+  EPA_WOOD_SMOKE,
+  WHO_AMBIENT_AIR,
+  WHO_HOUSEHOLD_AIR,
+} from './guidanceSources.js';
+import { commuteSwitchImpact } from './impact/commute.js';
+import { INHALATION_M3_PER_MIN, exposureChangeImpact } from './impact/exposure.js';
+import { keepWindowsClosedImpact, purifierImpact } from './impact/indoor.js';
+import { DESNZ_2026, EPA_AIR_CLEANER_GUIDE, EPA_EFH_CH6, XIANG_2021 } from './impact/sources.js';
+
+export interface PlanContext {
+  report: AirReport;
+  profile: Profile;
+  /** ISO 3166-1 alpha-2 country code of the place, used for grid carbon intensity. */
+  countryCode?: string;
+}
+
+export interface Action {
+  id: string;
+  section: Section;
+  title: string;
+  /** Plain-words explanation of the direct impact. The impact chip carries any number. */
+  defaultWhy: string;
+  /** 1 to 100; higher is more important and is shown first. */
+  priority: number;
+  applies(ctx: PlanContext): boolean;
+  /** A number computed in code, or null when the inputs for it are missing. */
+  impact?(ctx: PlanContext): Impact | null;
+  sources: Source[];
+}
+
+/** US AQI at which the air is unhealthy for sensitive groups. */
+const AQI_USG = 101;
+/** US AQI at which the air is unhealthy for everyone. */
+const AQI_UNHEALTHY = 151;
+/** Longest commute, one way, for which a bike is offered as the swap. */
+const BIKE_MAX_KM = 8;
+
+// ---- Context helpers (exported for the planner) ------------------------------------------
+
+export const currentAqi = (ctx: PlanContext): number | null => ctx.report.now?.aqi ?? null;
+
+const aqiAtLeast =
+  (threshold: number) =>
+  (ctx: PlanContext): boolean => {
+    const aqi = currentAqi(ctx);
+    return aqi !== null && aqi >= threshold;
+  };
+
+export const windowOf = (report: AirReport, kind: AirWindow['kind']): AirWindow | undefined =>
+  report.windows.find((w) => w.kind === kind);
+
+/** Local `HH:MM` of a local ISO `YYYY-MM-DDTHH:00` time. */
+export const clockTime = (iso: string): string => iso.slice(11, 16);
+
+const HOUR_MS = 3_600_000;
+const indexOfTime = (report: AirReport, iso: string): number =>
+  report.hourly.findIndex((r) => r?.time === iso);
+
+/** Index of the next hour (counting the current one) whose local clock hour is `hour`. */
+const indexOfLocalHour = (report: AirReport, hour: number): number =>
+  report.hourly.findIndex((r) => r !== null && Number(r.time.slice(11, 13)) === hour);
+
+const windowHours = (w: AirWindow): number =>
+  Math.round((Date.parse(`${w.end}:00Z`) - Date.parse(`${w.start}:00Z`)) / HOUR_MS);
+
+// ---- Exercise ---------------------------------------------------------------------------
+
+const EXERCISE_LEVEL: Record<NonNullable<Profile['exercise']>['type'], ActivityLevel> = {
+  run: 'high',
+  cycle: 'moderate',
+  walk: 'light',
+  sport: 'high',
+};
+
+const EXERCISE_NOUN: Record<NonNullable<Profile['exercise']>['type'], string> = {
+  run: 'run',
+  cycle: 'ride',
+  walk: 'walk',
+  sport: 'workout',
+};
+
+/** The usual exercise hour and the cleanest window, as indexes into the 48-hour report. */
+function exerciseSlots(
+  ctx: PlanContext,
+): { usual: number; best: number; bestWindow: AirWindow } | null {
+  const { exercise } = ctx.profile;
+  const bestWindow = windowOf(ctx.report, 'best');
+  if (!exercise || !bestWindow) return null;
+  const usual = indexOfLocalHour(ctx.report, exercise.hour);
+  const best = indexOfTime(ctx.report, bestWindow.start);
+  if (usual < 0 || best < 0) return null;
+  return { usual, best, bestWindow };
+}
+
+function moveExerciseImpact(ctx: PlanContext): Impact | null {
+  const { exercise } = ctx.profile;
+  const slots = exerciseSlots(ctx);
+  if (!exercise || !slots) return null;
+  const before = ctx.report.pm25[slots.usual] ?? null;
+  const after = ctx.report.pm25[slots.best] ?? null;
+  if (before === null || after === null || !(before > 0)) return null;
+  const rate = INHALATION_M3_PER_MIN.adult[EXERCISE_LEVEL[exercise.type]];
+  const impact = exposureChangeImpact(
+    `Move your ${EXERCISE_NOUN[exercise.type]} to the cleanest window`,
+    { conc: before, rate, minutes: exercise.minutes },
+    { conc: after, rate, minutes: exercise.minutes },
+  );
+  return {
+    ...impact,
+    assumptions: [
+      ...impact.assumptions,
+      'Uses the forecast PM2.5 for the hour you usually exercise and for the first hour of the cleanest window, for an adult.',
+    ],
+  };
+}
+
+// ---- Commute ----------------------------------------------------------------------------
+
+const POLLUTING_MODES: readonly CommuteMode[] = ['car_petrol', 'car_diesel', 'motorbike'];
+const CAR_MODES: readonly CommuteMode[] = ['car_petrol', 'car_diesel'];
+const LOW_EMISSION_MODES: readonly CommuteMode[] = ['bus', 'rail', 'bike', 'walk', 'car_ev'];
+
+const commuteIn =
+  (modes: readonly CommuteMode[]) =>
+  (ctx: PlanContext): boolean => {
+    const { commute } = ctx.profile;
+    return commute !== null && modes.includes(commute.mode);
+  };
+
+function switchCommuteImpact(ctx: PlanContext): Impact | null {
+  const { commute } = ctx.profile;
+  if (!commute) return null;
+  const to: CommuteMode = commute.oneWayKm <= BIKE_MAX_KM ? 'bike' : 'rail';
+  return commuteSwitchImpact(commute.mode, to, commute.oneWayKm, ctx.countryCode);
+}
+
+// ---- Indoor -----------------------------------------------------------------------------
+
+const pm25Now = (ctx: PlanContext): number | null => ctx.report.pm25[0] ?? null;
+
+/** The best window is only worth airing the home in when the air is not itself unhealthy. */
+function canAirOut(ctx: PlanContext): boolean {
+  const best = windowOf(ctx.report, 'best');
+  return ctx.profile.home.canOpenWindows && best !== undefined && best.meanAqi < AQI_UNHEALTHY;
+}
+
+// ---- The catalogue ----------------------------------------------------------------------
+
+export const ACTIONS: readonly Action[] = [
+  // Routine: low-emission daily routines and how to move through the day.
+  {
+    id: 'exercise-indoors',
+    section: 'routine',
+    title: 'Move today’s workout indoors',
+    defaultWhy:
+      'Hard exercise makes you breathe far more air, so smog does the most harm while you work out. Indoors you breathe in much less of it.',
+    priority: 90,
+    applies: (ctx) => ctx.profile.exercise !== null && aqiAtLeast(AQI_UNHEALTHY)(ctx),
+    sources: [AIRNOW_PM_GUIDE, EPA_EFH_CH6],
+  },
+  {
+    id: 'n95-outdoors',
+    section: 'routine',
+    title: 'Wear a snug N95 or FFP2 mask if you must go out',
+    defaultWhy:
+      'A well-fitted respirator filters out most fine smog particles before you breathe them in. A loose cloth or surgical mask lets them slip in around the edges, and children’s faces are usually too small to seal one, so for them staying in is safer.',
+    priority: 85,
+    applies: aqiAtLeast(AQI_UNHEALTHY),
+    sources: [AIRNOW_PM_GUIDE, EPA_WILDFIRES_IAQ],
+  },
+  {
+    id: 'move-exercise-to-best-window',
+    section: 'routine',
+    title: 'Shift your exercise to the cleanest hours',
+    defaultWhy:
+      'Smog rises and falls through the day. Exercising when it is lowest means every breath carries less pollution.',
+    priority: 80,
+    applies: (ctx) => {
+      const slots = exerciseSlots(ctx);
+      if (!slots) return false;
+      const inBestWindow =
+        slots.usual >= slots.best && slots.usual < slots.best + windowHours(slots.bestWindow);
+      return !inBestWindow;
+    },
+    impact: moveExerciseImpact,
+    sources: [AIRNOW_PM_GUIDE, EPA_EFH_CH6],
+  },
+  {
+    id: 'school-run-timing',
+    section: 'routine',
+    title: 'Time the school run for cleaner air',
+    defaultWhy:
+      'Children are among those most at risk from fine particles. Leaving when the air is cleaner, and keeping them off the busiest roads, lowers what they breathe in.',
+    priority: 75,
+    applies: (ctx) => ctx.profile.household.children > 0 && ctx.profile.commute !== null,
+    sources: [AIRNOW_PM_GUIDE],
+  },
+  {
+    id: 'keep-medication-handy',
+    section: 'routine',
+    title: 'Keep your reliever medicine and action plan close',
+    defaultWhy:
+      'Smog can set off asthma and heart symptoms. With your medicine and plan to hand, you can act at the first sign instead of waiting for it to get worse.',
+    priority: 70,
+    applies: (ctx) =>
+      (ctx.profile.household.respiratory || ctx.profile.household.heart) &&
+      aqiAtLeast(AQI_USG)(ctx),
+    sources: [AIRNOW_PM_GUIDE],
+  },
+  {
+    id: 'lighter-activity',
+    section: 'routine',
+    title: 'Keep outdoor effort light and take breaks',
+    defaultWhy:
+      'The harder you breathe, the more smog reaches deep into your lungs. Easier effort and regular rests cut what you take in.',
+    priority: 60,
+    applies: aqiAtLeast(AQI_USG),
+    sources: [AIRNOW_PM_GUIDE],
+  },
+  {
+    id: 'avoid-worst-window',
+    section: 'routine',
+    title: 'Keep errands out of the smoggiest hours',
+    defaultWhy:
+      'Pollution peaks at certain hours. Doing outdoor jobs just before or after the peak keeps you out of the thickest air.',
+    priority: 55,
+    applies: (ctx) => {
+      const worst = windowOf(ctx.report, 'worst');
+      return worst !== undefined && worst.meanAqi >= AQI_USG;
+    },
+    sources: [AIRNOW_PM_GUIDE],
+  },
+  {
+    id: 'check-hourly-outlook',
+    section: 'routine',
+    title: 'Check the hourly outlook before you head out',
+    defaultWhy:
+      'Air quality changes through the day, so a quick look at the hours ahead beats guessing from this morning.',
+    priority: 30,
+    applies: () => true,
+    sources: [AIRNOW_PM_GUIDE],
+  },
+
+  // Indoor: hacks that keep the air at home as clean as it can be.
+  {
+    id: 'keep-windows-closed',
+    section: 'indoor',
+    title: 'Keep windows and doors shut while the air is bad',
+    defaultWhy:
+      'A shut-up home stays cleaner than the air outside because far less smog leaks in. Every open window lets it flow straight through.',
+    priority: 88,
+    applies: aqiAtLeast(AQI_USG),
+    impact: (ctx) => {
+      const pm = pm25Now(ctx);
+      return pm === null ? null : keepWindowsClosedImpact(pm);
+    },
+    sources: [XIANG_2021, EPA_WILDFIRES_IAQ],
+  },
+  {
+    id: 'run-purifier',
+    section: 'indoor',
+    title: 'Run your air purifier in the room you use most',
+    defaultWhy:
+      'A purifier keeps pulling fine particles out of the room’s air, so the air you breathe indoors gets cleaner than closing the windows alone.',
+    priority: 84,
+    applies: (ctx) => ctx.profile.home.purifier,
+    impact: (ctx) => {
+      const pm = pm25Now(ctx);
+      const { purifierCadrM3h, roomM3 } = ctx.profile.home;
+      return pm === null ? null : purifierImpact(pm, purifierCadrM3h, roomM3);
+    },
+    sources: [EPA_AIR_CLEANER_GUIDE, XIANG_2021],
+  },
+  {
+    id: 'no-indoor-smoking',
+    section: 'indoor',
+    title: 'Take smoking outside',
+    defaultWhy:
+      'Tobacco smoke fills a closed home with the same fine particles as smog, and they linger. Smoking outside keeps your indoor air as clean as it can be.',
+    priority: 80,
+    applies: (ctx) => ctx.profile.home.indoorSmoking,
+    sources: [EPA_INTRO_IAQ],
+  },
+  {
+    id: 'diy-box-fan-filter',
+    section: 'indoor',
+    title: 'Build a box-fan air cleaner',
+    defaultWhy:
+      'When buying a purifier is not an option, a box fan with a furnace filter fixed to it can clear fine particles from a room, as long as it is built carefully.',
+    priority: 74,
+    applies: (ctx) => !ctx.profile.home.purifier,
+    sources: [EPA_DIY_AIR_CLEANERS, EPA_WILDFIRES_IAQ],
+  },
+  {
+    id: 'avoid-wood-coal-heating',
+    section: 'indoor',
+    title: 'Heat with something cleaner than wood or coal',
+    defaultWhy:
+      'Burning wood or coal fills the room and the street with fine particles. Cleaner heat keeps both your air and your neighbours’ air better.',
+    priority: 72,
+    applies: (ctx) => ctx.profile.home.heating === 'wood_coal',
+    sources: [EPA_WOOD_SMOKE, WHO_HOUSEHOLD_AIR],
+  },
+  {
+    id: 'clean-room',
+    section: 'indoor',
+    title: 'Set up one clean room for the family',
+    defaultWhy:
+      'Keeping one room closed up, with a purifier or box-fan cleaner running, gives everyone, especially sensitive family members, a place to breathe easier.',
+    priority: 68,
+    applies: aqiAtLeast(AQI_UNHEALTHY),
+    sources: [EPA_WILDFIRES_IAQ],
+  },
+  {
+    id: 'air-out-in-best-window',
+    section: 'indoor',
+    title: 'Open the windows briefly at the cleanest hour',
+    defaultWhy:
+      'Stale air builds up in a sealed home. A short airing when the outdoor air is at its best refreshes the rooms with the least smog coming in.',
+    priority: 66,
+    applies: canAirOut,
+    sources: [EPA_IMPROVING_IAQ],
+  },
+  {
+    id: 'ventilate-while-cooking',
+    section: 'indoor',
+    title: 'Use the cooker hood or a window while you cook',
+    defaultWhy:
+      'Cooking over gas or solid fuel releases fine particles and gases into the room. Venting them outside stops them adding to the smog you are already breathing.',
+    priority: 62,
+    applies: (ctx) => ctx.profile.home.cooking === 'gas' || ctx.profile.home.cooking === 'solid',
+    sources: [EPA_IMPROVING_IAQ, WHO_HOUSEHOLD_AIR],
+  },
+  {
+    id: 'swap-purifier-filter',
+    section: 'indoor',
+    title: 'Check your purifier’s filter',
+    defaultWhy:
+      'A clogged filter moves less clean air. Replacing it on schedule keeps the purifier doing its job.',
+    priority: 40,
+    applies: (ctx) => ctx.profile.home.purifier,
+    sources: [EPA_AIR_CLEANER_GUIDE],
+  },
+
+  // Sustainable: lower-emission alternatives that cut smog at the source.
+  {
+    id: 'no-waste-burning',
+    section: 'sustainable',
+    title: 'Never burn rubbish, leaves or crop waste',
+    defaultWhy:
+      'Open burning puts thick smoke and fine particles into the air at street level, and on still winter evenings it hangs around. Sending waste for collection stops it at the source.',
+    priority: 76,
+    applies: () => true,
+    sources: [WHO_AMBIENT_AIR],
+  },
+  {
+    id: 'switch-commute',
+    section: 'sustainable',
+    title: 'Leave the car or motorbike at home when you can',
+    defaultWhy:
+      'Every trip not made in a petrol or diesel vehicle means less exhaust on your street and less carbon in the atmosphere. The chip shows what a regular switch saves.',
+    priority: 78,
+    applies: commuteIn(POLLUTING_MODES),
+    impact: switchCommuteImpact,
+    sources: [DESNZ_2026, WHO_AMBIENT_AIR],
+  },
+  {
+    id: 'cleaner-cooking-fuel',
+    section: 'sustainable',
+    title: 'Move toward cleaner cooking fuel',
+    defaultWhy:
+      'Cooking on wood, dung or charcoal is a major source of fine particles in the home. Gas, electric or induction cooking removes most of that smoke at the source.',
+    priority: 64,
+    applies: (ctx) => ctx.profile.home.cooking === 'solid',
+    sources: [WHO_HOUSEHOLD_AIR],
+  },
+  {
+    id: 'combine-trips',
+    section: 'sustainable',
+    title: 'Combine errands into one trip',
+    defaultWhy:
+      'Fewer, planned trips mean fewer cold starts and less time idling in traffic, so less exhaust on your street.',
+    priority: 58,
+    applies: commuteIn(CAR_MODES),
+    sources: [WHO_AMBIENT_AIR],
+  },
+  {
+    id: 'share-the-ride',
+    section: 'sustainable',
+    title: 'Share the ride with a neighbour or colleague',
+    defaultWhy: 'Two people in one car take one vehicle’s exhaust off the road instead of two.',
+    priority: 52,
+    applies: commuteIn(CAR_MODES),
+    sources: [WHO_AMBIENT_AIR],
+  },
+  {
+    id: 'electrify-heating',
+    section: 'sustainable',
+    title: 'Plan a switch to electric heating',
+    defaultWhy:
+      'Electric heating puts no smoke or exhaust into your home or street, so the smog you add in winter drops at the source.',
+    priority: 50,
+    applies: (ctx) =>
+      ctx.profile.home.heating === 'gas' || ctx.profile.home.heating === 'wood_coal',
+    sources: [WHO_AMBIENT_AIR, WHO_HOUSEHOLD_AIR],
+  },
+  {
+    id: 'keep-low-emission-commute',
+    section: 'sustainable',
+    title: 'Keep up your low-emission commute',
+    defaultWhy:
+      'Buses, trains, bikes, walking and electric cars add little or no tailpipe exhaust to your street. Your commute is already helping, so hold on to it.',
+    priority: 45,
+    applies: commuteIn(LOW_EMISSION_MODES),
+    sources: [DESNZ_2026, WHO_AMBIENT_AIR],
+  },
+  {
+    id: 'community-air-action',
+    section: 'sustainable',
+    title: 'Share what you have learned with your street or school',
+    defaultWhy:
+      'Much of a city’s air pollution is beyond what one household can control, so agreeing on habits like no burning, or backing local clean-air measures, goes further than going it alone.',
+    priority: 35,
+    applies: () => true,
+    sources: [WHO_AMBIENT_AIR],
+  },
+];

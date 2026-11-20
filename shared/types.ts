@@ -85,3 +85,72 @@ export interface Impact {
   assumptions: string[];
   sources: Source[];
 }
+
+/** Who lives in the home and how they get around, exercise and heat/cook. Stays in the browser. */
+export interface Profile {
+  household: {
+    adults: number;
+    children: number;
+    olderAdults: number;
+    pregnant: boolean;
+    respiratory: boolean;
+    heart: boolean;
+  };
+  commute: { mode: CommuteMode; oneWayKm: number; departHour: number } | null;
+  exercise: { type: 'run' | 'cycle' | 'walk' | 'sport'; hour: number; minutes: number } | null;
+  home: {
+    purifier: boolean;
+    purifierCadrM3h?: number;
+    roomM3?: number;
+    cooking: 'gas' | 'electric' | 'solid';
+    heating: 'gas' | 'electric' | 'wood_coal' | 'none';
+    canOpenWindows: boolean;
+    indoorSmoking: boolean;
+  };
+}
+
+export type Section = 'routine' | 'indoor' | 'sustainable';
+
+export interface HealthGuidance {
+  category: AqiCategory;
+  sensitive: boolean;
+  headline: string;
+  advice: string[];
+  source: Source;
+}
+
+export interface PlanItem {
+  actionId: string;
+  section: Section;
+  title: string;
+  why: string;
+  /** Local `HH:MM` the action is best done at, when there is one. */
+  time?: string;
+  impact: Impact | null;
+  sources: Source[];
+}
+
+export interface Plan {
+  summary: string;
+  health: HealthGuidance;
+  routine: PlanItem[];
+  indoor: PlanItem[];
+  sustainable: PlanItem[];
+  aiUsed: boolean;
+  generatedAt: string;
+}
+
+/** The only profile facts that ever leave the server toward an AI model: flags and categories, no counts per group. */
+export interface MinimalProfile {
+  sensitiveGroups: ('children' | 'older_adults' | 'pregnancy' | 'respiratory' | 'heart')[];
+  householdSize: number;
+  commute: { mode: CommuteMode; oneWayKm: number } | null;
+  exercise: { type: string; minutes: number } | null;
+  home: {
+    purifier: boolean;
+    cooking: string;
+    heating: string;
+    canOpenWindows: boolean;
+    indoorSmoking: boolean;
+  };
+}
