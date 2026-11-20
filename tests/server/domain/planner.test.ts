@@ -50,13 +50,37 @@ describe('selectCandidates', () => {
     const move = cands.find((c) => c.action.id === 'move-exercise-to-best-window');
     expect(move?.impact?.unit).toBe('%');
     expect(move?.suggestedTime).toBe('15:00');
+    expect(move?.suggestedStart).toBe('2026-11-20T15:00');
+    expect(move?.suggestedDay).toBe('Tomorrow');
     const air = cands.find((c) => c.action.id === 'air-out-in-best-window');
     expect(air?.suggestedTime).toBe('15:00');
+    expect(air?.suggestedDay).toBe('Tomorrow');
     const sw = cands.find((c) => c.action.id === 'switch-commute');
     expect(sw?.impact?.unit).toBe('kg CO₂e/yr');
     const n95 = cands.find((c) => c.action.id === 'n95-outdoors');
     expect(n95?.impact).toBeNull();
     expect(n95?.suggestedTime).toBeUndefined();
+  });
+
+  it('gives no day label when the best window is later today', () => {
+    const today = makeReport({
+      aqiAt: (i) => (i >= 2 && i <= 3 ? 60 : 212),
+      pm25At: (i) => (i >= 2 && i <= 3 ? 20 : 150),
+    });
+    const c = selectCandidates({ ...smoggy, report: today });
+    const air = c.find((x) => x.action.id === 'air-out-in-best-window');
+    expect(air?.suggestedTime).toBe('16:00');
+    expect(air?.suggestedStart).toBe('2026-11-19T16:00');
+    expect(air?.suggestedDay).toBeUndefined();
+  });
+
+  it('labels tomorrow when it is late evening and the cleanest daytime hours are tomorrow', () => {
+    const late = makeReport({ startHour: 22 });
+    const air = selectCandidates({ ...smoggy, report: late }).find(
+      (x) => x.action.id === 'air-out-in-best-window',
+    );
+    expect(air?.suggestedStart?.slice(0, 10)).toBe('2026-11-20');
+    expect(air?.suggestedDay).toBe('Tomorrow');
   });
 
   it('sorts by priority, highest first', () => {
@@ -98,6 +122,8 @@ describe('buildFallbackPlan', () => {
   it('carries the suggested time onto items and merges impact sources without duplicates', () => {
     const move = plan.routine.find((i) => i.actionId === 'move-exercise-to-best-window');
     expect(move?.time).toBe('15:00');
+    expect(move?.start).toBe('2026-11-20T15:00');
+    expect(move?.day).toBe('Tomorrow');
     for (const s of move?.impact?.sources ?? []) {
       expect(move?.sources.some((x) => x.url === s.url)).toBe(true);
     }

@@ -7,7 +7,15 @@ import type {
   Profile,
   Section,
 } from '../../../shared/types.js';
-import { ACTIONS, clockTime, type Action, type PlanContext, windowOf } from './catalog.js';
+import {
+  ACTIONS,
+  clockTime,
+  dayLabel,
+  reportToday,
+  type Action,
+  type PlanContext,
+  windowOf,
+} from './catalog.js';
 import { CATEGORY_LABEL, healthGuidance } from './health.js';
 import { uniqueSources } from './impact/sources.js';
 
@@ -17,17 +25,19 @@ export interface Candidate {
   impact: Impact | null;
   /** Local `HH:MM`. */
   suggestedTime?: string;
+  /** Local ISO `YYYY-MM-DDTHH:MM` of `suggestedTime`. */
+  suggestedStart?: string;
+  /** "Tomorrow" or a weekday when `suggestedStart` is not on the report's current local day. */
+  suggestedDay?: string;
 }
 
 /** Most items shown in each section of the fallback plan. */
 const MAX_PER_SECTION = 4;
 
-const bestStart = (ctx: PlanContext): string | undefined => {
-  const best = windowOf(ctx.report, 'best');
-  return best ? clockTime(best.start) : undefined;
-};
+/** Local ISO start of the cleanest daytime window. */
+const bestStart = (ctx: PlanContext): string | undefined => windowOf(ctx.report, 'best')?.start;
 
-/** Actions that are best done at a particular time of day. */
+/** Actions that are best done at a particular time of day; each rule gives a local ISO time. */
 const TIME_RULES: Readonly<Record<string, (ctx: PlanContext) => string | undefined>> = {
   'move-exercise-to-best-window': bestStart,
   'air-out-in-best-window': bestStart,
@@ -43,11 +53,14 @@ export function isSensitive(p: Profile): boolean {
 export function selectCandidates(ctx: PlanContext): Candidate[] {
   return ACTIONS.filter((a) => a.applies(ctx))
     .map((action): Candidate => {
-      const suggestedTime = TIME_RULES[action.id]?.(ctx);
+      const start = TIME_RULES[action.id]?.(ctx);
+      const today = reportToday(ctx.report);
+      const day = start !== undefined && today ? dayLabel(start, today) : undefined;
       return {
         action,
         impact: action.impact?.(ctx) ?? null,
-        ...(suggestedTime !== undefined ? { suggestedTime } : {}),
+        ...(start !== undefined ? { suggestedTime: clockTime(start), suggestedStart: start } : {}),
+        ...(day !== undefined ? { suggestedDay: day } : {}),
       };
     })
     .sort((a, b) => b.action.priority - a.action.priority);
@@ -89,13 +102,15 @@ function healthFor(ctx: PlanContext): HealthGuidance {
 }
 
 export function toItem(c: Candidate): PlanItem {
-  const { action, impact, suggestedTime } = c;
+  const { action, impact, suggestedTime, suggestedStart, suggestedDay } = c;
   return {
     actionId: action.id,
     section: action.section,
     title: action.title,
     why: action.defaultWhy,
     ...(suggestedTime !== undefined ? { time: suggestedTime } : {}),
+    ...(suggestedStart !== undefined ? { start: suggestedStart } : {}),
+    ...(suggestedDay !== undefined ? { day: suggestedDay } : {}),
     impact,
     sources: uniqueSources([...action.sources, ...(impact?.sources ?? [])]),
   };

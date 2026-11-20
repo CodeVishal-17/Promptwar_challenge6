@@ -49,40 +49,53 @@ function sources(item: PlanItem): HTMLElement | null {
   );
 }
 
+/** `<time>` for an item's clock time, machine-readable as the full local timestamp when known. */
+const timeEl = (item: PlanItem): HTMLElement =>
+  h('time', { datetime: item.start ?? item.time ?? '' }, item.time ?? '');
+
+/** "Best at 11:00", "Best tomorrow at 11:00" or "Best on Saturday at 11:00". */
+function bestAt(item: PlanItem): HTMLElement {
+  const day =
+    item.day === undefined ? '' : item.day === 'Tomorrow' ? 'tomorrow ' : `on ${item.day} `;
+  return h('p', { class: 'plan-item__when' }, `Best ${day}at `, timeEl(item));
+}
+
 /** One action as a card: title, why it matters, its impact chip and sources. */
 function itemCard(item: PlanItem, showTime: boolean): HTMLElement {
   return h(
     'article',
     { class: 'card plan-item' },
     h('h4', { class: 'plan-item__title' }, item.title),
-    showTime && item.time
-      ? h(
-          'p',
-          { class: 'plan-item__when' },
-          'Best at ',
-          h('time', { datetime: item.time }, item.time),
-        )
-      : null,
+    showTime && item.time ? bestAt(item) : null,
     h('p', { class: 'plan-item__why' }, item.why),
     item.impact ? impactChip(item.impact) : null,
     sources(item),
   );
 }
 
-/** All-day actions first (in the plan's priority order), then timed ones by clock time. */
+/** Sort key for a timed item: its full local timestamp, so tomorrow's 06:00 follows tonight's 22:00. */
+const when = (i: PlanItem): string => i.start ?? i.time ?? '';
+
+/** All-day actions first (in the plan's priority order), then timed ones in time order. */
 export function timelineOrder(items: readonly PlanItem[]): PlanItem[] {
   const allDay = items.filter((i) => !i.time);
-  // `HH:MM` strings sort as times; sort() is stable, so equal times keep the plan's order.
-  const timed = items
-    .filter((i) => i.time)
-    .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
+  // ISO and `HH:MM` strings sort as times; sort() is stable, so equal times keep the plan's order.
+  const timed = items.filter((i) => i.time).sort((a, b) => when(a).localeCompare(when(b)));
   return [...allDay, ...timed];
 }
 
-/** The time column; a label that repeats the one above is kept for screen readers only. */
+/** The time column, with the day when it is not today; a repeat of the label above is for screen readers only. */
 function timeLabel(item: PlanItem, previous: PlanItem | undefined): HTMLElement {
-  const repeats = previous !== undefined && previous.time === item.time;
-  const label = item.time ? h('time', { datetime: item.time }, item.time) : 'All day';
+  const repeats =
+    previous !== undefined && previous.time === item.time && when(previous) === when(item);
+  const label = item.time
+    ? h(
+        'span',
+        {},
+        ...(item.day ? [h('span', { class: 'timeline__day' }, item.day), ' '] : []),
+        timeEl(item),
+      )
+    : 'All day';
   return h(
     'p',
     { class: 'timeline__time' },

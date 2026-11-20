@@ -67,6 +67,33 @@ describe('renderPlan', () => {
     expect(el.querySelector('.timeline time')?.getAttribute('datetime')).toBe('07:00');
   });
 
+  it('labels a time that falls tomorrow and sorts by full timestamp across midnight', () => {
+    const routine = [
+      makeItem({
+        title: 'Tomorrow morning',
+        time: '06:00',
+        start: '2026-11-21T06:00',
+        day: 'Tomorrow',
+      }),
+      makeItem({ title: 'Tonight', time: '22:00', start: '2026-11-20T22:00' }),
+    ];
+    renderPlan(el, makePlan({ routine }));
+    expect(texts('.timeline .plan-item__title')).toEqual(['Tonight', 'Tomorrow morning']);
+    expect(texts('.timeline__time')).toEqual(['22:00', 'Tomorrow 06:00']);
+    expect(texts('.timeline__day')).toEqual(['Tomorrow']);
+    const times = [...el.querySelectorAll('.timeline time')].map((t) => t.getAttribute('datetime'));
+    expect(times).toEqual(['2026-11-20T22:00', '2026-11-21T06:00']);
+  });
+
+  it('shows the same clock time on two days as two labels', () => {
+    const routine = [
+      makeItem({ title: 'A', time: '15:00', start: '2026-11-20T15:00' }),
+      makeItem({ title: 'B', time: '15:00', start: '2026-11-21T15:00', day: 'Tomorrow' }),
+    ];
+    renderPlan(el, makePlan({ routine }));
+    expect(el.querySelectorAll('.timeline__time .visually-hidden')).toHaveLength(0);
+  });
+
   it('shows a repeated time label once, keeping it for screen readers on the rest', () => {
     renderPlan(el, makePlan({ routine: [makeItem(), makeItem({ title: 'Second' })] }));
     const labels = [...el.querySelectorAll('.timeline__time')];
@@ -88,6 +115,20 @@ describe('renderPlan', () => {
     });
     renderPlan(el, plan);
     expect(el.querySelector('.plan-item__when')?.textContent).toBe('Best at 06:00');
+  });
+
+  it('names the day on a best time that is not today', () => {
+    const at = (day: string) =>
+      makePlan({
+        indoor: [makeItem({ section: 'indoor', time: '11:00', start: '2026-11-21T11:00', day })],
+      });
+    renderPlan(el, at('Tomorrow'));
+    expect(el.querySelector('.plan-item__when')?.textContent).toBe('Best tomorrow at 11:00');
+    expect(el.querySelector('.plan-item__when time')?.getAttribute('datetime')).toBe(
+      '2026-11-21T11:00',
+    );
+    renderPlan(el, at('Saturday'));
+    expect(el.querySelector('.plan-item__when')?.textContent).toBe('Best on Saturday at 11:00');
   });
 
   it('says when the AI summary was unavailable', () => {

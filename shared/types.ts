@@ -126,6 +126,10 @@ export interface PlanItem {
   why: string;
   /** Local `HH:MM` the action is best done at, when there is one. */
   time?: string;
+  /** Local ISO `YYYY-MM-DDTHH:MM` that `time` falls on, for sorting and `<time datetime>`. */
+  start?: string;
+  /** "Tomorrow" or a weekday name when `time` is not on the place's current local day. */
+  day?: string;
   impact: Impact | null;
   sources: Source[];
 }

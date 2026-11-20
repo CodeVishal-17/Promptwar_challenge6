@@ -199,6 +199,32 @@ describe('makePlan', () => {
     expect(system).toContain('Never write a number');
   });
 
+  it('tells the AI which day each time falls on, with a rule not to imply today', async () => {
+    const client = fake(aiResponse());
+    await makePlan(ctx, { gemini: client, now: clock });
+    const { user, system } = client.calls[0]!;
+    const context = JSON.parse(/<context>([\s\S]*)<\/context>/.exec(user)?.[1] ?? '{}');
+    expect(context.air.bestWindow).toMatchObject({ day: 'tomorrow', from: '15:00' });
+    expect(context.air.worstWindow.day).toBe('today');
+    const move = context.candidates.find(
+      (c: { actionId: string }) => c.actionId === 'move-exercise-to-best-window',
+    );
+    expect(move).toMatchObject({ suggestedTime: '15:00', suggestedDay: 'tomorrow' });
+    expect(system).toMatch(/tomorrow/i);
+    expect(system).toMatch(/today/i);
+  });
+
+  it('keeps a day word the guard cannot check, and the day label from code, on the item', async () => {
+    const id = 'move-exercise-to-best-window';
+    const plan = await makePlan(ctx, {
+      gemini: fake(aiResponse({ items: [{ actionId: id, why: 'Go this afternoon.' }] })),
+      now: clock,
+    });
+    const item = plan.routine.find((i) => i.actionId === id);
+    expect(item?.why).toBe('Go this afternoon.');
+    expect(item?.day).toBe('Tomorrow');
+  });
+
   it('works without an air reading', async () => {
     const empty = { ...ctx, report: makeReport({}) };
     const plan = await makePlan(empty, { gemini: fake(aiResponse()), now: clock });

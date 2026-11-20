@@ -1205,6 +1205,11 @@
   line-height: var(--leading-normal);
 }
 
+.timeline__day {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-medium);
+}
+
 .timeline__dot {
   grid-column: 1;
   grid-row: 1 / span 2;
@@ -1230,6 +1235,11 @@
     margin-bottom: 0;
     padding-top: var(--space-5);
     text-align: right;
+  }
+
+  .timeline__day {
+    display: block;
+    overflow-wrap: anywhere;
   }
 
   .timeline__dot {

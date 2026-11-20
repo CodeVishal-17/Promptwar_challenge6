@@ -3,10 +3,11 @@ import { findWindows } from '../../../server/src/domain/windows.js';
 import type { AirReport, AqiReading, Profile } from '../../../shared/types.js';
 import { DEFAULT_PROFILE } from '../../../shared/profile.js';
 
-const START = Date.UTC(2026, 10, 19, 14); // 14:00 local, 19 Nov 2026
+/** 14:00 local, 19 Nov 2026, unless a report says otherwise. */
+const START_HOUR = 14;
 
-const localTime = (i: number): string =>
-  new Date(START + i * 3_600_000).toISOString().slice(0, 13) + ':00';
+const localTime = (i: number, startHour = START_HOUR): string =>
+  new Date(Date.UTC(2026, 10, 19, startHour) + i * 3_600_000).toISOString().slice(0, 13) + ':00';
 
 export interface ReportShape {
   /** AQI for each of the 48 hours (index 0 = now). */
@@ -14,6 +15,8 @@ export interface ReportShape {
   /** Raw PM2.5 for each hour. */
   pm25At?: (i: number) => number | null;
   now?: boolean;
+  /** Local clock hour of index 0 on 19 Nov 2026 (default 14). */
+  startHour?: number;
 }
 
 /** A synthetic 48-hour report; PM2.5 defaults to a smooth daily swing, AQI to PM2.5 × 2. */
@@ -23,7 +26,7 @@ export function makeReport(shape: ReportShape = {}): AirReport {
   const hourly: (AqiReading | null)[] = Array.from({ length: 48 }, (_, i) => {
     const aqi = aqiAt(i);
     return {
-      time: localTime(i),
+      time: localTime(i, shape.startHour),
       aqi,
       category: categoryFor(aqi),
       dominant: 'pm2_5' as const,

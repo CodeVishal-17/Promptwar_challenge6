@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { ACTIONS, type Action, type PlanContext } from '../../../server/src/domain/catalog.js';
+import {
+  ACTIONS,
+  dayLabel,
+  type Action,
+  type PlanContext,
+} from '../../../server/src/domain/catalog.js';
 import { commuteSwitchImpact } from '../../../server/src/domain/impact/commute.js';
 import {
   INHALATION_M3_PER_MIN,
@@ -61,6 +66,17 @@ describe('ACTIONS catalogue', () => {
   });
 });
 
+describe('dayLabel', () => {
+  it('is undefined for today, "Tomorrow" for the next day and the weekday beyond', () => {
+    expect(dayLabel('2026-11-19T15:00', '2026-11-19')).toBeUndefined();
+    expect(dayLabel('2026-11-20T06:00', '2026-11-19')).toBe('Tomorrow');
+    expect(dayLabel('2026-11-21T06:00', '2026-11-19')).toBe('Saturday');
+  });
+  it('handles a month end', () => {
+    expect(dayLabel('2026-12-01T09:00', '2026-11-30')).toBe('Tomorrow');
+  });
+});
+
 describe('move-exercise-to-best-window', () => {
   const a = byId('move-exercise-to-best-window');
 
@@ -110,7 +126,20 @@ describe('move-exercise-to-best-window', () => {
     const impact = a.impact?.(ctx(runner));
     expect(impact?.value).toBe(-80);
     expect(impact?.display).toBe(expected.display);
-    expect(impact?.inputs).toEqual(expected.inputs);
+    // Labelled with day and time: the usual hour is its next occurrence, here tomorrow.
+    expect(impact?.inputs).toEqual([
+      { label: 'Before, tomorrow 06:00', value: expected.inputs[0]?.value },
+      { label: 'After, tomorrow 15:00', value: expected.inputs[1]?.value },
+    ]);
+  });
+  it('labels the before and after inputs "today" when both hours are today', () => {
+    const soonBest = makeReport({
+      aqiAt: (i) => (i >= 1 && i <= 3 ? 60 : 212),
+      pm25At: (i) => (i >= 1 && i <= 3 ? 20 : 150),
+    });
+    const missed = profileWith({ exercise: { type: 'run', hour: 14, minutes: 45 } });
+    const labels = a.impact?.(ctx(missed, soonBest))?.inputs.map((x) => x.label);
+    expect(labels).toEqual(['Before, today 14:00', 'After, today 15:00']);
   });
   it('uses the lighter walking rate for a walk', () => {
     const walker = profileWith({ exercise: { type: 'walk', hour: 6, minutes: 30 } });

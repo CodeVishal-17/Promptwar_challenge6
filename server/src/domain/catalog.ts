@@ -69,6 +69,39 @@ export const windowOf = (report: AirReport, kind: AirWindow['kind']): AirWindow 
 export const clockTime = (iso: string): string => iso.slice(11, 16);
 
 const HOUR_MS = 3_600_000;
+const DAY_MS = 86_400_000;
+
+/** Local date `YYYY-MM-DD` of the report's first hour (the current one), when any hour is known. */
+export function reportToday(report: AirReport): string | undefined {
+  const i = report.hourly.findIndex((r) => r !== null);
+  const first = report.hourly[i];
+  if (!first) return undefined;
+  return new Date(Date.parse(`${first.time}:00Z`) - i * HOUR_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * "Tomorrow", or the weekday name further ahead, for a local ISO time not on local date
+ * `today`; undefined when it is today. Dates are read as wall-clock, so no zone shifts them.
+ */
+export function dayLabel(iso: string, today: string): string | undefined {
+  const days = Math.round(
+    (Date.parse(`${iso.slice(0, 10)}T00:00Z`) - Date.parse(`${today}T00:00Z`)) / DAY_MS,
+  );
+  if (!Number.isFinite(days) || days === 0) return undefined;
+  if (days === 1) return 'Tomorrow';
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'long', timeZone: 'UTC' }).format(
+    new Date(`${iso.slice(0, 10)}T00:00:00Z`),
+  );
+}
+
+/** The day of a local ISO time as a word for running text: "today", "tomorrow" or a weekday. */
+export function dayWord(iso: string, report: AirReport): string {
+  const today = reportToday(report);
+  const label = today ? dayLabel(iso, today) : undefined;
+  if (!label) return 'today';
+  return label === 'Tomorrow' ? 'tomorrow' : label;
+}
+
 const indexOfTime = (report: AirReport, iso: string): number =>
   report.hourly.findIndex((r) => r?.time === iso);
 
@@ -121,8 +154,18 @@ function moveExerciseImpact(ctx: PlanContext): Impact | null {
     { conc: before, rate, minutes: exercise.minutes },
     { conc: after, rate, minutes: exercise.minutes },
   );
+  // The usual hour is its next occurrence and the best window may be on another day: say which.
+  const when = (i: number): string => {
+    const time = ctx.report.hourly[i]?.time ?? '';
+    return `${dayWord(time, ctx.report)} ${clockTime(time)}`;
+  };
+  const [beforeInput, afterInput] = impact.inputs;
   return {
     ...impact,
+    inputs: [
+      { label: `Before, ${when(slots.usual)}`, value: beforeInput?.value ?? '' },
+      { label: `After, ${when(slots.best)}`, value: afterInput?.value ?? '' },
+    ],
     assumptions: [
       ...impact.assumptions,
       'Uses the forecast PM2.5 for the hour you usually exercise and for the first hour of the cleanest window, for an adult.',
