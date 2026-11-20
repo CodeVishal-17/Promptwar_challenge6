@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_PROFILE } from '../../shared/profile.js';
-import type { AirReport, Place, Plan, PlanRequest } from '../../shared/types.js';
+import type { AirReport, AskRequest, Place, Plan, PlanRequest } from '../../shared/types.js';
 import { ApiError } from '../../web/src/api.js';
 import { boot } from '../../web/src/main.js';
 import {
@@ -31,7 +31,10 @@ const byText = (root: ParentNode, text: string): HTMLButtonElement | undefined =
 let getAir: ReturnType<typeof vi.fn<(lat: number, lon: number) => Promise<AirReport>>>;
 let getPlan: ReturnType<typeof vi.fn<(body: PlanRequest) => Promise<Plan>>>;
 const searchPlaces = vi.fn(async (): Promise<Place[]> => []);
-const deps = () => ({ api: { getAir, getPlan, searchPlaces } });
+let ask: ReturnType<
+  typeof vi.fn<(body: AskRequest) => Promise<{ answer: string; aiUsed: boolean }>>
+>;
+const deps = () => ({ api: { getAir, getPlan, searchPlaces, ask } });
 
 /** Types a query into the location search and picks the first suggestion. */
 async function pickFromSearch(): Promise<void> {
@@ -48,6 +51,7 @@ beforeEach(() => {
   loadShell();
   getAir = vi.fn(async () => makeReport());
   getPlan = vi.fn(async () => makePlan());
+  ask = vi.fn(async () => ({ answer: 'Go at dusk.', aiUsed: true }));
 });
 afterEach(() => {
   document.title = '';
@@ -362,5 +366,45 @@ describe('first visit', () => {
     expect(hasSeenOnboarding()).toBe(true);
     expect(loadProfile().home.indoorSmoking).toBe(true);
     expect(getPlan.mock.calls[0]?.[0].profile.home.indoorSmoking).toBe(true);
+  });
+});
+
+describe('ask panel', () => {
+  async function submitQuestion(text: string): Promise<void> {
+    const textarea = document.querySelector('#ask-body textarea') as HTMLTextAreaElement;
+    textarea.value = text;
+    textarea.dispatchEvent(new Event('input'));
+    (document.querySelector('#ask-body button[type="submit"]') as HTMLButtonElement).click();
+    await flush();
+  }
+
+  it('is hidden until a place’s air has loaded, then asks with that place and profile', async () => {
+    expect(section('ask').hidden).toBe(true);
+    savePlace(PLACE);
+    await boot(deps());
+    expect(section('ask').hidden).toBe(false);
+    await submitQuestion('Should I run?');
+    expect(ask).toHaveBeenCalledWith(
+      expect.objectContaining({ lat: PLACE.lat, lon: PLACE.lon, question: 'Should I run?' }),
+    );
+    expect(document.getElementById('ask-body')?.textContent).toContain('Go at dusk.');
+  });
+
+  it('hides and clears the answer when the place changes, and drops a pending answer', async () => {
+    savePlace(PLACE);
+    await boot(deps());
+    let resolveAsk: (r: { answer: string; aiUsed: boolean }) => void = () => {};
+    ask.mockImplementationOnce(() => new Promise((r) => (resolveAsk = r)));
+    await submitQuestion('Should I run?');
+    searchPlaces.mockResolvedValueOnce([
+      { ...PLACE, name: 'Lima', admin1: undefined, country: 'Peru', countryCode: 'PE' },
+    ]);
+    getAir.mockImplementationOnce(() => new Promise(() => {}));
+    await pickFromSearch();
+    await flush();
+    expect(section('ask').hidden).toBe(true);
+    resolveAsk({ answer: 'Old place answer.', aiUsed: true });
+    await flush();
+    expect(document.querySelector('#ask-body .ask__answer')?.textContent).toBe('');
   });
 });

@@ -1,6 +1,7 @@
 import type { AirReport, Place, Plan, PlanRequest, Profile } from '../../shared/types.js';
 import * as realApi from './api.js';
 import { ApiError } from './api.js';
+import { mountAskPanel, type AskPanel } from './components/askPanel.js';
 import { renderAqiCard, renderAqiError, renderAqiSkeleton } from './components/aqiCard.js';
 import { renderForecast as drawForecast } from './components/forecastChart.js';
 import { mountLocationSearch } from './components/locationSearch.js';
@@ -84,6 +85,9 @@ let planGeneration = 0;
  * place's air is loading or has failed, so nothing can plan for a place without its air.
  */
 let loaded: { place: Place; hasReading: boolean } | null = null;
+
+/** The mounted Q&A panel, so a place change can clear its answer. */
+let askPanel: AskPanel | null = null;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -192,6 +196,8 @@ let generation = 0;
 function resetDependents(): void {
   loaded = null;
   planGeneration++;
+  askPanel?.reset();
+  byId('ask').hidden = true;
   for (const id of ['forecast', 'plan']) {
     const section = byId(id);
     section.hidden = true;
@@ -244,6 +250,7 @@ async function showPlace(place: Place): Promise<void> {
   );
   const hasReading = report.now !== null;
   loaded = { place, hasReading };
+  byId('ask').hidden = false;
   if (hasSeenOnboarding()) await requestPlan(place, loadProfile(), { hasReading });
   else onboardThenPlan(place, hasReading);
 }
@@ -257,6 +264,11 @@ export async function boot(deps: BootDeps = {}): Promise<void> {
   planCache.clear();
   renderMethod(byId('method-body'));
   byId('edit-profile').onclick = editProfile;
+  askPanel = mountAskPanel(
+    byId('ask-body'),
+    () => (loaded ? { place: loaded.place, profile: loadProfile() } : null),
+    { ask: (body) => api.ask(body) },
+  );
   mountLocationSearch(
     byId('location-search'),
     (place) => {
