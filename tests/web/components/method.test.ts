@@ -21,7 +21,9 @@ describe('renderMethod', () => {
 
   it('states the averaging and the scale', () => {
     const text = el.textContent ?? '';
-    expect(text).toContain('24-hour average');
+    expect(text).toContain('NowCast');
+    expect(text).toContain('last 12 hours');
+    expect(text).not.toContain('24-hour average');
     expect(text).toContain('8-hour');
     expect(text).toContain('0 to 500');
   });

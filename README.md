@@ -82,13 +82,16 @@ screen is computed in code first, and the model may only repeat numbers it was g
 - It uses the breakpoint tables of the EPA Technical Assistance Document (2024), including the
   2024 PM2.5 breakpoints. Concentrations are truncated to the EPA reporting precision before
   Equation 1 is applied.
-- PM2.5 and PM10 use a trailing 24-hour mean (at least 18 valid hours). Ozone uses the higher of
-  the trailing 8-hour mean (at least 6 valid hours) and the 1-hour value. NO₂ uses the 1-hour
-  value.
+- PM2.5 and PM10 use the EPA NowCast for each hour, as EPA AirNow does: a weighted mean of the
+  last 12 hours with weight factor w = 1 − (max − min) ÷ max (at least 0.5), needing 2 of the 3
+  most recent hours. It is read against the 24-hour breakpoints, so the 48-hour chart and the
+  cleanest and worst windows follow the daily smog cycle. Ozone uses the higher of the trailing
+  8-hour mean (at least 6 valid hours) and the 1-hour value. NO₂ uses the 1-hour value.
 - Ozone and NO₂ are converted from µg/m³ to ppb at 25 °C and 1 atm (`units.ts`).
 - Above 500 the top segment is extended, as footnote 4 of the EPA document directs, so a 24-hour
   PM2.5 of 600 µg/m³ reads as 1047 rather than being clipped.
-- The "now" figure is an hourly estimate built from trailing averages, and the page says so.
+- The "now" figure is an hourly estimate built from the NowCast and trailing averages, and the
+  page says so.
 - The tests cover the breakpoints, truncation, the EPA's ozone worked examples and every
   category boundary (`tests/server/domain/aqi.test.ts`).
 

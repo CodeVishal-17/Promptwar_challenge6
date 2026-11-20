@@ -160,6 +160,42 @@ function validAt(values: (number | null)[], i: number): number | null {
   return v !== null && v !== undefined && Number.isFinite(v) ? v : null;
 }
 
+/** Hours the NowCast looks back over, the current hour included. */
+const NOWCAST_HOURS = 12;
+/** Lowest NowCast weight factor; at 0.5 the NowCast approximates a 3-hour average. */
+const NOWCAST_MIN_WEIGHT = 0.5;
+
+/**
+ * EPA NowCast for PM2.5 and PM10 at index `end` of an hourly series (µg/m³), the method AirNow
+ * uses for hourly PM AQI. Source: AQI_SOURCE (EPA TAD 2024, p. 16, "NowCast").
+ * Over the last 12 hours: weight factor w = 1 − (max − min) / max, at least 0.5, and
+ * NowCast = Σ w^k·c_k / Σ w^k, with k hours ago (0 = the current hour). Missing hours are
+ * skipped in both sums. Null unless at least 2 of the 3 most recent hours are valid.
+ */
+export function nowCast(values: (number | null)[], end: number): number | null {
+  if (end < 0 || end >= values.length) return null;
+  const recent: { c: number; k: number }[] = [];
+  for (let k = 0; k < NOWCAST_HOURS && end - k >= 0; k++) {
+    const c = validAt(values, end - k);
+    if (c !== null) recent.push({ c, k });
+  }
+  if (recent.filter(({ k }) => k < 3).length < 2) return null;
+
+  const cs = recent.map(({ c }) => c);
+  const max = Math.max(...cs);
+  if (max === 0) return 0;
+  const min = Math.min(...cs);
+  const w = Math.max(NOWCAST_MIN_WEIGHT, 1 - (max - min) / max);
+
+  let weighted = 0;
+  let weights = 0;
+  for (const { c, k } of recent) {
+    weighted += w ** k * c;
+    weights += w ** k;
+  }
+  return weighted / weights;
+}
+
 /** Best (highest) of the non-null candidates, or null if there are none. */
 function maxOrNull(...candidates: (number | null)[]): number | null {
   const present = candidates.filter((v): v is number => v !== null);
@@ -170,16 +206,16 @@ const POLLUTANT_ORDER: readonly Pollutant[] = ['pm2_5', 'pm10', 'o3', 'no2'];
 
 /**
  * AQI for hour index `i` of an hourly series (concentrations in µg/m³).
- * PM uses a 24-hour trailing mean (18 valid hours), ozone the higher of its 8-hour (6 valid)
- * and 1-hour sub-indices, NO2 the 1-hour value. Overall AQI is the highest sub-index.
- * Returns null when no pollutant yields a sub-index.
+ * PM uses the EPA NowCast on the 24-hour breakpoints (as AirNow does for hourly PM), ozone the
+ * higher of its 8-hour (6 valid) and 1-hour sub-indices, NO2 the 1-hour value. Overall AQI is
+ * the highest sub-index. Returns null when no pollutant yields a sub-index.
  */
 export function computeHourlyAqi(s: HourlyConcentrations, i: number): AqiReading | null {
   const time = s.time[i];
   if (time === undefined) return null;
 
-  const pm25Mean = trailingMean(s.pm2_5, i, 24, 18);
-  const pm10Mean = trailingMean(s.pm10, i, 24, 18);
+  const pm25Mean = nowCast(s.pm2_5, i);
+  const pm10Mean = nowCast(s.pm10, i);
   const o3Mean8 = trailingMean(s.o3, i, 8, 6);
   const o3Now = validAt(s.o3, i);
   const no2Now = validAt(s.no2, i);

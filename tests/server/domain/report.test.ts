@@ -49,7 +49,7 @@ describe('buildAirReport', () => {
     expect(report.now).not.toBeNull();
   });
 
-  it('uses past history so PM trailing means are available at the current hour', () => {
+  it('uses past history so the PM NowCast is available at the current hour', () => {
     expect(report.now?.perPollutant.pm2_5).toBeDefined();
     expect(report.now).toEqual(computeHourlyAqi(all, idx));
   });
@@ -100,6 +100,32 @@ describe('buildAirReport', () => {
     expect(worst).toBeDefined();
     expect(Number(best?.start.slice(11, 13))).toBeGreaterThanOrEqual(6);
     expect(best?.meanAqi).toBeLessThanOrEqual(worst?.meanAqi ?? 0);
+  });
+
+  it('follows a daily smog cycle: best and worst windows sit at its trough and peak', () => {
+    // Delhi-like winter PM2.5, 90 µg/m³ at 11:00 rising to 250 µg/m³ at 23:00, every day.
+    const time = fixture.hourly.time;
+    const pm = time.map((t) => {
+      const hour = Number(t.slice(11, 13));
+      return Math.round((170 + 80 * Math.cos((2 * Math.PI * (hour - 23)) / 24)) * 10) / 10;
+    });
+    const nulls = time.map(() => null);
+    const diurnal: OpenMeteoAirResponse = {
+      ...fixture,
+      hourly: { time, pm2_5: pm, pm10: nulls, ozone: nulls, nitrogen_dioxide: nulls },
+    };
+    const r = buildAirReport(diurnal, NOW);
+    const aqis = r.hourly.map((h) => h?.aqi ?? 0);
+    expect(Math.max(...aqis) - Math.min(...aqis)).toBeGreaterThan(100);
+
+    const best = r.windows.find((w) => w.kind === 'best');
+    const worst = r.windows.find((w) => w.kind === 'worst');
+    expect(best?.start).not.toBe(worst?.start);
+    expect(best?.meanAqi).toBeLessThan(worst?.meanAqi ?? 0);
+    // The NowCast lags the raw cycle by an hour or so.
+    expect(Number(best?.start.slice(11, 13))).toBeGreaterThanOrEqual(11);
+    expect(Number(best?.start.slice(11, 13))).toBeLessThanOrEqual(13);
+    expect(['23', '00', '01']).toContain(worst?.start.slice(11, 13));
   });
 
   it('throws when the current time is outside the returned data', () => {

@@ -3,6 +3,7 @@ import {
   AQI_SOURCE,
   categoryFor,
   computeHourlyAqi,
+  nowCast,
   subIndex,
   trailingMean,
 } from '../../../server/src/domain/aqi.js';
@@ -71,6 +72,56 @@ describe('trailingMean', () => {
   });
 });
 
+describe('nowCast (EPA TAD 2024, p. 16)', () => {
+  it('matches a hand-computed example', () => {
+    // Most recent first: 50, 40, 45. Range 10, scaled rate 10/50 = 0.2, so w = 0.8.
+    // (50 + 0.8 × 40 + 0.64 × 45) / (1 + 0.8 + 0.64) = 110.8 / 2.44 = 45.4098…
+    expect(nowCast([45, 40, 50], 2)).toBeCloseTo(110.8 / 2.44, 9);
+  });
+  it('clamps the weight factor at 0.5 when the air changes fast', () => {
+    // Most recent first: 40, 30, 20. w = 1 − 20/40 = 0.5. (40 + 15 + 5) / 1.75
+    expect(nowCast([20, 30, 40], 2)).toBeCloseTo(60 / 1.75, 9);
+    // 1 − 90/100 = 0.1 is below the floor, so w = 0.5: (100 + 0.5 × 10 + 0.25 × 10) / 1.75
+    expect(nowCast([10, 10, 100], 2)).toBeCloseTo(107.5 / 1.75, 9);
+  });
+  it('is close to the 12-hour mean when the air is stable', () => {
+    const values = Array.from({ length: 12 }, (_, k) => (k % 2 === 0 ? 29 : 31));
+    expect(Math.abs((nowCast(values, 11) ?? 0) - 30)).toBeLessThan(0.5);
+    expect(nowCast(Array(12).fill(30), 11)).toBe(30);
+  });
+  it('weights the most recent hours after a sharp rise, approaching a 3-hour average', () => {
+    const values = [...Array(9).fill(10), 100, 100, 100];
+    const twelveHourMean = values.reduce((a, b) => a + b, 0) / 12; // 32.5
+    const result = nowCast(values, 11) ?? 0;
+    expect(result).toBeGreaterThan(85);
+    expect(result).toBeLessThan(100); // the 3-hour mean
+    expect(result).toBeGreaterThan(twelveHourMean * 2.5);
+  });
+  it('looks back 12 hours at most, the current hour included', () => {
+    expect(nowCast([500, ...Array(12).fill(20)], 12)).toBe(20);
+  });
+  it('needs at least 2 of the 3 most recent hours', () => {
+    const past = Array(9).fill(20);
+    expect(nowCast([...past, 20, null, null], 11)).toBeNull();
+    expect(nowCast([...past, null, 20, null], 11)).toBeNull();
+    expect(nowCast([...past, null, null, 20], 11)).toBeNull();
+    expect(nowCast([...past, null, 20, 20], 11)).toBe(20);
+    expect(nowCast([30], 0)).toBeNull();
+    expect(nowCast([30, 30], 1)).toBe(30);
+  });
+  it('skips missing hours in both sums', () => {
+    // Most recent first: 40, missing, 20. w = 0.5, so the weights are 1 and 0.25.
+    expect(nowCast([20, null, 40], 2)).toBeCloseTo((40 + 0.25 * 20) / 1.25, 9);
+  });
+  it('returns 0 when the highest valid hour is 0', () => {
+    expect(nowCast([0, 0, 0], 2)).toBe(0);
+  });
+  it('returns null for an index outside the series', () => {
+    expect(nowCast([10, 10], 5)).toBeNull();
+    expect(nowCast([10, 10], -1)).toBeNull();
+  });
+});
+
 describe('computeHourlyAqi', () => {
   const n = 24;
   const series = (v: number | null): (number | null)[] => Array(n).fill(v);
@@ -91,6 +142,30 @@ describe('computeHourlyAqi', () => {
     expect(r?.category).toBe('usg');
     expect(r?.time).toBe(time[23]);
     expect(r?.perPollutant.pm2_5).toBe(102);
+  });
+  it('uses the NowCast for PM, so a rise in the last hours shows at once', () => {
+    const s: HourlyConcentrations = {
+      time,
+      pm2_5: series(20).map((v, h) => (h >= 21 ? 200 : v)),
+      pm10: series(30).map((v, h) => (h >= 21 ? 300 : v)),
+      o3: series(null),
+      no2: series(null),
+    };
+    const r = computeHourlyAqi(s, 23);
+    expect(r?.perPollutant.pm2_5).toBe(subIndex('pm2_5_24h', nowCast(s.pm2_5, 23) ?? -1));
+    expect(r?.perPollutant.pm10).toBe(subIndex('pm10_24h', nowCast(s.pm10, 23) ?? -1));
+    // A 24-hour mean would be 42.5 µg/m³ (AQI 117); the NowCast leans on the last 3 hours.
+    expect(r?.aqi).toBeGreaterThan(250);
+  });
+  it('gives PM no sub-index when 2 of the last 3 hours are missing', () => {
+    const s: HourlyConcentrations = {
+      time,
+      pm2_5: series(20).map((v, h) => (h >= 22 ? null : v)),
+      pm10: series(null),
+      o3: series(null),
+      no2: series(40),
+    };
+    expect(computeHourlyAqi(s, 23)?.perPollutant).toEqual({ no2: expect.any(Number) });
   });
   describe('dominant pollutant selection', () => {
     const base = (): HourlyConcentrations => ({

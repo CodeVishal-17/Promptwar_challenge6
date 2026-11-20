@@ -42,7 +42,8 @@ function dailyOutlook(readings: (AqiReading | null)[]): DailyOutlook[] {
 
 /**
  * Builds the air report: the current hour, the next 48 hours, best/worst windows and a
- * per-day outlook. AQI is computed over the full series so trailing means see past hours.
+ * per-day outlook. AQI is computed over the full series so the NowCast and the ozone
+ * 8-hour mean see past hours.
  * Throws if the current time is not covered by the data.
  */
 export function buildAirReport(raw: OpenMeteoAirResponse, now: Date): AirReport {
