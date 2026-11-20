@@ -676,3 +676,184 @@
     transform: rotate(1turn);
   }
 }
+
+/* ---------- Forecast chart, table and outlook ---------- */
+
+.forecast {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.chart-wrap {
+  margin-inline: calc(var(--space-2) * -1);
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chart__bar {
+  fill: var(--aqi-color);
+}
+
+.chart__gap {
+  fill: var(--aqi-color);
+  opacity: 0.8;
+}
+
+.chart__window {
+  fill: var(--color-sunken);
+  stroke: var(--color-border-strong);
+  stroke-width: 1;
+}
+
+.chart__window--worst {
+  stroke-dasharray: 4 3;
+}
+
+.chart__grid,
+.chart__tick,
+.chart__baseline {
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
+.chart__baseline,
+.chart__tick {
+  stroke: var(--color-border-strong);
+}
+
+.chart__axis-label,
+.chart__tick-label,
+.chart__window-label {
+  fill: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+}
+
+.chart__window-label {
+  fill: var(--color-text);
+  font-weight: var(--weight-semibold);
+}
+
+.forecast__windows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.forecast__muted {
+  color: var(--color-text-muted);
+}
+
+.forecast__actions {
+  display: flex;
+}
+
+.forecast__table-wrap {
+  max-height: 22rem;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table caption {
+  padding: var(--space-3);
+  color: var(--color-text-muted);
+  text-align: left;
+}
+
+.data-table th,
+.data-table td {
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--color-sunken);
+  font-weight: var(--weight-semibold);
+}
+
+.data-table tbody th {
+  font-weight: var(--weight-regular);
+}
+
+.data-table .num {
+  text-align: right;
+}
+
+.data-table td .aqi-swatch {
+  display: inline-block;
+  margin: 0 var(--space-2) 0 0;
+  vertical-align: -0.15em;
+}
+
+.forecast__subtitle {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-lg);
+}
+
+.outlook {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.outlook__day {
+  display: grid;
+  grid-template-columns: minmax(6rem, 1fr) 2fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.outlook__name {
+  font-weight: var(--weight-medium);
+}
+
+.outlook__category {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.outlook__category .aqi-swatch {
+  margin-top: 0;
+}
+
+.outlook__aqi {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 30rem) {
+  .outlook__day {
+    grid-template-columns: 1fr auto;
+  }
+
+  .outlook__category {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

@@ -37,6 +37,14 @@ describe('boot', () => {
     expect(document.querySelector('[role="combobox"]')).not.toBeNull();
   });
 
+  it('reveals the forecast section and draws the chart once the air arrives', async () => {
+    savePlace(PLACE);
+    expect((document.getElementById('forecast') as HTMLElement).hidden).toBe(true);
+    await boot({ api: { getAir, searchPlaces } });
+    expect((document.getElementById('forecast') as HTMLElement).hidden).toBe(false);
+    expect(document.querySelector('#forecast-body svg[role="img"]')).not.toBeNull();
+  });
+
   it('loads the saved place, fetches its air and renders the AQI card', async () => {
     savePlace(PLACE);
     await boot({ api: { getAir, searchPlaces } });

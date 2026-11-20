@@ -2,6 +2,7 @@ import type { AirReport, Place, Profile } from '../../shared/types.js';
 import * as realApi from './api.js';
 import { ApiError } from './api.js';
 import { renderAqiCard, renderAqiError, renderAqiSkeleton } from './components/aqiCard.js';
+import { renderForecast as drawForecast } from './components/forecastChart.js';
 import { mountLocationSearch } from './components/locationSearch.js';
 import { announce } from './dom.js';
 import { CATEGORY_LABEL, formatPlace } from './format.js';
@@ -21,9 +22,10 @@ export interface BootDeps {
 /** The API the app talks to; `boot` swaps in injected fakes. Later tasks read it from here. */
 export let api: AppApi = realApi;
 
-/** Draws the 48-hour chart and outlook. Placeholder until Task 9 replaces it. */
+/** Draws the 48-hour chart and outlook, and reveals their section. */
 export function renderForecast(report: AirReport): void {
-  void report;
+  drawForecast(byId('forecast-body'), report);
+  byId('forecast').hidden = false;
 }
 
 /** Fetches and shows the household plan. Placeholder until Task 10 replaces it. */
