@@ -109,16 +109,17 @@ export function mountAskPanel(
     try {
       const out = await ask(request);
       if (mine !== generation) return;
+      finish(); // not busy when the text lands, or some screen readers stay silent
       show(
         ...paragraphs(out.answer),
         out.aiUsed ? null : h('p', { class: 'ask__note' }, STANDARD_ANSWER),
       );
     } catch (err) {
       if (mine !== generation) return;
+      finish();
       const limited = err instanceof ApiError && err.code === 'rate_limited';
       show(h('p', { class: 'ask__message' }, limited ? RATE_LIMITED : GENERIC_ERROR));
     }
-    finish();
   }
 
   textarea.addEventListener('input', sync);

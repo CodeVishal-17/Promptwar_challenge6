@@ -183,4 +183,25 @@ describe('askPanel', () => {
     await flush();
     expect(answer.textContent).toBe('');
   });
+
+  it('clears aria-busy before the answer or error is inserted, so it is announced', async () => {
+    for (const ask of [
+      resolved(),
+      vi.fn<AskFn>(async () => {
+        throw new ApiError('timeout', 0);
+      }),
+    ]) {
+      const { send, answer, submit } = mount(ask);
+      const seen: (string | null)[] = [];
+      const original = answer.replaceChildren.bind(answer);
+      answer.replaceChildren = (...nodes) => {
+        if (nodes.length) seen.push(answer.getAttribute('aria-busy'));
+        original(...nodes);
+      };
+      submit.disabled = false;
+      await send('Hi');
+      expect(seen).toHaveLength(1);
+      expect(seen[0]).not.toBe('true');
+    }
+  });
 });
