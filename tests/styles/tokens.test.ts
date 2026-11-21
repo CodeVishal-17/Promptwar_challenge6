@@ -63,3 +63,11 @@ describe('sky tint', () => {
     for (const sky of skies) expect(contrast('#1b2a33', sky), sky).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+describe('Use my location', () => {
+  it('stays a sunny button with dark text, above the secondary button style', () => {
+    const rule = /\.search-panel \.locate-button\s*\{[^}]*\}/.exec(css('shell.css'))?.[0] ?? '';
+    expect(rule).toMatch(/background:\s*var\(--color-sun\)/);
+    expect(rule).toMatch(/color:\s*var\(--color-text\)/);
+  });
+});

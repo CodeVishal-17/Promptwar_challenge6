@@ -227,7 +227,7 @@ body {
 
 @media (min-width: 48rem) {
   .today-hero {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
     justify-items: start;
     align-items: center;
     gap: var(--space-5);
@@ -237,6 +237,18 @@ body {
 
 .search-panel[hidden] {
   display: none;
+}
+
+/* "Use my location" is the sunny call to action (it also carries .btn--secondary's shape). */
+.search-panel .locate-button {
+  border-color: transparent;
+  background: var(--color-sun);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.search-panel .locate-button:hover {
+  background: var(--color-sun-hover);
 }
 
 .change-place {
@@ -560,29 +572,30 @@ body {
   transform: translateX(-50%) rotate(45deg);
 }
 
+/*
+ * With a place chosen, the hero is one column and Puff sits beside his bubble; before that, he
+ * stands above it, next to the welcome text.
+ */
 @media (min-width: 48rem) {
-  .today-hero__puff .puff-says {
+  .screen--today:has(#now:not([hidden])) .today-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .screen--today:has(#now:not([hidden])) .puff-says {
     grid-template-columns: auto 1fr;
     align-items: center;
     justify-items: start;
     gap: var(--space-4);
   }
 
-  .today-hero__puff .puff-says__bubble {
+  .screen--today:has(#now:not([hidden])) .puff-says__bubble {
     text-align: left;
   }
 
-  .today-hero__puff .puff-says__bubble::before {
+  .screen--today:has(#now:not([hidden])) .puff-says__bubble::before {
     top: 50%;
     left: -7px;
     transform: translateY(-50%) rotate(45deg);
-  }
-}
-
-/* With a place chosen, Puff and his bubble take the hero's full width. */
-@media (min-width: 48rem) {
-  .screen--today:has(#now:not([hidden])) .today-hero {
-    grid-template-columns: 1fr;
   }
 }
 
