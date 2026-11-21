@@ -55,15 +55,27 @@ describe('selectCandidates', () => {
     const air = cands.find((c) => c.action.id === 'air-out-in-best-window');
     expect(air?.suggestedTime).toBe('15:00');
     expect(air?.suggestedDay).toBe('Tomorrow');
-    const school = cands.find((c) => c.action.id === 'school-run-timing');
-    expect(school?.suggestedStart).toBe('2026-11-20T15:00');
-    expect(school?.suggestedDay).toBe('Tomorrow');
-    expect(school?.impact?.unit).toBe('%');
+    // 07:00, 08:00 and 09:00 tomorrow are equally smoggy, so there is no school run to re-time.
+    expect(cands.find((c) => c.action.id === 'school-run-timing')).toBeUndefined();
     const sw = cands.find((c) => c.action.id === 'switch-commute');
     expect(sw?.impact?.unit).toBe('kg CO₂e/yr');
     const n95 = cands.find((c) => c.action.id === 'n95-outdoors');
     expect(n95?.impact).toBeNull();
     expect(n95?.suggestedTime).toBeUndefined();
+  });
+
+  it('times the school run an hour either side of the usual departure, with its day', () => {
+    const earlier = makeReport({
+      pm25At: (i) => (i === 17 ? 40 : 150),
+      aqiAt: (i) => (i === 17 ? 80 : 300),
+    });
+    const school = selectCandidates({ ...smoggy, report: earlier }).find(
+      (c) => c.action.id === 'school-run-timing',
+    );
+    expect(school?.suggestedTime).toBe('07:00');
+    expect(school?.suggestedStart).toBe('2026-11-20T07:00');
+    expect(school?.suggestedDay).toBe('Tomorrow');
+    expect(school?.impact?.unit).toBe('%');
   });
 
   it('gives no day label when the best window is later today', () => {

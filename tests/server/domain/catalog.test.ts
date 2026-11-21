@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   ACTIONS,
   dayLabel,
+  schoolRunStart,
   type Action,
   type PlanContext,
 } from '../../../server/src/domain/catalog.js';
 import { commuteSwitchImpact } from '../../../server/src/domain/impact/commute.js';
+import { EPA_EFH_CH6 } from '../../../server/src/domain/impact/sources.js';
 import {
   INHALATION_M3_PER_MIN,
   exposureChangeImpact,
@@ -160,48 +162,68 @@ describe('move-exercise-to-best-window', () => {
   });
 });
 
-describe('school-run-timing uses the departure hour', () => {
+describe('school-run-timing compares the hour either side of departure', () => {
   const a = byId('school-run-timing');
   const family = (departHour: number) =>
     profileWith({
       household: { children: 1 },
       commute: { mode: 'car_petrol', oneWayKm: 5, departHour },
     });
+  /** Index 0 is today 14:00, so 17, 18 and 19 are tomorrow 07:00, 08:00 and 09:00. */
+  const around8 = (pm7: number | null, pm9: number | null, aqi7?: number) =>
+    makeReport({
+      pm25At: (i) => (i === 17 ? pm7 : i === 19 ? pm9 : 150),
+      aqiAt: (i) => (i === 17 ? (aqi7 ?? (pm7 ?? 150) * 2) : i === 19 ? (pm9 ?? 150) * 2 : 300),
+    });
 
-  it('compares PM2.5 at the usual departure with the cleanest daytime hours that day', () => {
-    // Smoggy report: next 08:00 is tomorrow; that day's cleanest daytime hours start at 15:00.
-    const c = ctx(family(8));
+  it('suggests 07:00 for an 08:00 departure when 07:00 is cleaner', () => {
+    const c = ctx(family(8), around8(40, 120));
     expect(a.applies(c)).toBe(true);
-    const rate = INHALATION_M3_PER_MIN.child.light;
-    const expected = exposureChangeImpact(
-      'Time the school run for the cleanest daytime hours',
-      { conc: 150, rate, minutes: 1 },
-      { conc: 30, rate, minutes: 1 },
-    );
+    expect(schoolRunStart(c)).toBe('2026-11-20T07:00');
     const impact = a.impact?.(c);
-    expect(impact?.value).toBe(-80);
-    expect(impact?.display).toBe(expected.display);
+    expect(impact?.value).toBe(-73); // (40 − 150) ÷ 150
+    expect(impact?.display).toBe('−73% PM2.5 inhaled');
+    expect(impact?.label).toBe('Leave an hour earlier for the school run');
     expect(impact?.inputs).toEqual([
-      { label: 'Before, tomorrow 08:00', value: expected.inputs[0]?.value },
-      { label: 'After, tomorrow 15:00', value: expected.inputs[1]?.value },
+      { label: 'Usual departure (tomorrow 08:00)', value: '150 µg/m³ PM2.5' },
+      { label: 'An hour earlier (tomorrow 07:00)', value: '40 µg/m³ PM2.5' },
     ]);
-    expect(impact?.assumptions.join(' ')).toMatch(/any trip length/);
   });
-  it('changes with the departure hour', () => {
-    // At 16:00 the same-day daytime hours (today) are all unhealthy, so there is nothing to time.
-    expect(a.applies(ctx(family(16)))).toBe(false);
-    // Leaving inside the cleanest hours already: nothing to move.
-    expect(a.applies(ctx(family(15)))).toBe(false);
+  it('picks whichever neighbour is cleaner, here 09:00', () => {
+    const c = ctx(family(8), around8(60, 45));
+    expect(schoolRunStart(c)).toBe('2026-11-20T09:00');
+    expect(a.impact?.(c)?.inputs[1]?.label).toBe('An hour later (tomorrow 09:00)');
   });
-  it('does not apply when that day has no cleaner daytime hours', () => {
+  it('shows concentrations, not a made-up trip length', () => {
+    const impact = a.impact?.(ctx(family(8), around8(40, 120)));
+    expect(JSON.stringify(impact?.inputs)).not.toMatch(/min/);
+    expect(impact?.assumptions.join(' ')).toMatch(/same length and effort/);
+    expect(impact?.sources.map((s) => s.url)).toContain(EPA_EFH_CH6.url);
+  });
+  it('is absent when neither neighbour is cleaner', () => {
+    // Smoggy report: 07:00, 08:00 and 09:00 tomorrow are all 150 µg/m³.
+    expect(a.applies(ctx(family(8)))).toBe(false);
+    expect(schoolRunStart(ctx(family(8)))).toBeUndefined();
     expect(a.applies(ctx(family(8), clean))).toBe(false);
   });
-  it('does not apply when the cleanest daytime hours are themselves unhealthy', () => {
+  it('is absent when the cleaner neighbour is still unhealthy (AQI 151 or more)', () => {
+    expect(a.applies(ctx(family(8), around8(100, 150, 160)))).toBe(false);
+  });
+  it('is absent when the neighbours have no PM2.5 reading', () => {
+    expect(a.applies(ctx(family(8), around8(null, null)))).toBe(false);
+  });
+  it('never crosses midnight to the day before', () => {
+    // The next 00:00 is index 10; index 9 (23:00 on the 19th) is much cleaner but another day.
     const report = makeReport({
-      aqiAt: (i) => (i >= 25 && i <= 27 ? 160 : 300),
-      pm25At: (i) => (i >= 25 && i <= 27 ? 70 : 200),
+      pm25At: (i) => (i === 9 ? 10 : 150),
+      aqiAt: (i) => (i === 9 ? 20 : 300),
     });
-    expect(a.applies(ctx(family(8), report))).toBe(false);
+    expect(a.applies(ctx(family(0), report))).toBe(false);
+  });
+  it('changes with the departure hour', () => {
+    const report = around8(40, 150);
+    expect(a.applies(ctx(family(8), report))).toBe(true);
+    expect(a.applies(ctx(family(16), report))).toBe(false);
   });
 });
 
@@ -215,9 +237,15 @@ describe('exercise and school actions', () => {
   it('school-run-timing needs children and a commute', () => {
     const a = byId('school-run-timing');
     const commute = { mode: 'car_petrol' as const, oneWayKm: 5, departHour: 8 };
-    expect(a.applies(ctx(profileWith({ household: { children: 1 }, commute })))).toBe(true);
-    expect(a.applies(ctx(profileWith({ commute })))).toBe(false);
-    expect(a.applies(ctx(profileWith({ household: { children: 1 } })))).toBe(false);
+    // 07:00 tomorrow (index 17) is cleaner than the 08:00 departure.
+    const report = makeReport({
+      pm25At: (i) => (i === 17 ? 40 : 150),
+      aqiAt: (i) => (i === 17 ? 80 : 300),
+    });
+    const withBoth = profileWith({ household: { children: 1 }, commute });
+    expect(a.applies(ctx(withBoth, report))).toBe(true);
+    expect(a.applies(ctx(profileWith({ commute }), report))).toBe(false);
+    expect(a.applies(ctx(profileWith({ household: { children: 1 } }), report))).toBe(false);
   });
   it('n95-outdoors is words only and needs AQI of 151 or more', () => {
     const a = byId('n95-outdoors');

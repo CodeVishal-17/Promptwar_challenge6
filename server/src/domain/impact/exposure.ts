@@ -40,6 +40,49 @@ function formatDose(ug: number): string {
 const describe = (s: ExposureScenario): string =>
   `${formatNumber(s.conc, 1)} µg/m³ × ${formatNumber(s.rate, 4)} m³/min × ${formatNumber(s.minutes, 0)} min = ${formatDose(inhaledDoseUg(s.conc, s.rate, s.minutes))} µg`;
 
+/** The PM2.5 in the air at one moment, with a label saying which. */
+export interface LabelledConcentration {
+  label: string;
+  /** PM2.5 in µg/m³. */
+  conc: number;
+}
+
+/**
+ * Percentage change in inhaled PM2.5 for the same trip made at another hour. With the same
+ * length and effort, rate × minutes cancels in (after − before) ÷ before, so the change in
+ * the dose equals the change in concentration and no trip length has to be assumed.
+ * Throws a RangeError without a positive baseline.
+ */
+export function sameTripExposureImpact(
+  label: string,
+  before: LabelledConcentration,
+  after: LabelledConcentration,
+): Impact {
+  assertNonNegative('before.conc', before.conc);
+  assertNonNegative('after.conc', after.conc);
+  if (before.conc === 0)
+    throw new RangeError('The baseline PM2.5 is zero, so a percentage change is undefined');
+  const value = roundPercent(((after.conc - before.conc) / before.conc) * 100);
+  const conc = (c: LabelledConcentration) => ({
+    label: c.label,
+    value: `${formatNumber(c.conc, 1)} µg/m³ PM2.5`,
+  });
+  return {
+    label,
+    value,
+    unit: '%',
+    display: `${formatPercentChange(value)} PM2.5 inhaled`,
+    formula:
+      'inhaled PM2.5 = PM2.5 (µg/m³) × inhalation rate (m³/min) × minutes; for the same trip, rate and minutes cancel, so change = (PM2.5 after − PM2.5 before) ÷ PM2.5 before',
+    inputs: [conc(before), conc(after)],
+    assumptions: [
+      'The trip is the same length and effort at either hour, so the change in PM2.5 breathed in equals the change in PM2.5 in the air.',
+      'PM2.5 is the level in the air you breathe during the trip.',
+    ],
+    sources: [EPA_EFH_CH6],
+  };
+}
+
 /**
  * Percentage change in inhaled PM2.5 going from scenario `a` to scenario `b`,
  * rounded to an integer; negative means less inhaled.

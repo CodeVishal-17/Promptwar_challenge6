@@ -3,6 +3,7 @@ import {
   INHALATION_M3_PER_MIN,
   exposureChangeImpact,
   inhaledDoseUg,
+  sameTripExposureImpact,
 } from '../../../../server/src/domain/impact/exposure.js';
 import { EPA_EFH_CH6 } from '../../../../server/src/domain/impact/sources.js';
 
@@ -99,5 +100,33 @@ describe('exposureChangeImpact', () => {
     expect(() =>
       exposureChangeImpact('x', { conc: 0, rate, minutes: 30 }, { conc: 5, rate, minutes: 30 }),
     ).toThrow(RangeError);
+  });
+});
+
+describe('sameTripExposureImpact', () => {
+  const impact = sameTripExposureImpact(
+    'Leave an hour earlier',
+    { label: 'Usual departure', conc: 150 },
+    { label: 'An hour earlier', conc: 40 },
+  );
+
+  it('gives the change in PM2.5 breathed in on the same trip as the change in concentration', () => {
+    expect(impact.value).toBe(-73);
+    expect(impact.unit).toBe('%');
+    expect(impact.display).toBe('−73% PM2.5 inhaled');
+    expect(impact.inputs).toEqual([
+      { label: 'Usual departure', value: '150 µg/m³ PM2.5' },
+      { label: 'An hour earlier', value: '40 µg/m³ PM2.5' },
+    ]);
+  });
+  it('states why rate and minutes cancel, and cites the EPA handbook for the dose formula', () => {
+    expect(impact.formula).toMatch(/inhalation rate/);
+    expect(impact.assumptions.join(' ')).toMatch(/same length and effort/);
+    expect(impact.sources).toEqual([EPA_EFH_CH6]);
+  });
+  it('throws without a positive baseline', () => {
+    const at = (conc: number) => ({ label: 'x', conc });
+    expect(() => sameTripExposureImpact('x', at(0), at(5))).toThrow(RangeError);
+    expect(() => sameTripExposureImpact('x', at(10), at(-1))).toThrow(RangeError);
   });
 });

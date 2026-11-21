@@ -19,9 +19,12 @@ import {
   WHO_HOUSEHOLD_AIR,
 } from './guidanceSources.js';
 import { commuteSwitchImpact } from './impact/commute.js';
-import { INHALATION_M3_PER_MIN, exposureChangeImpact } from './impact/exposure.js';
+import {
+  INHALATION_M3_PER_MIN,
+  exposureChangeImpact,
+  sameTripExposureImpact,
+} from './impact/exposure.js';
 import { keepWindowsClosedImpact, purifierImpact } from './impact/indoor.js';
-import { findWindows } from './windows.js';
 import { DESNZ_2026, EPA_AIR_CLEANER_GUIDE, EPA_EFH_CH6, XIANG_2021 } from './impact/sources.js';
 
 export interface PlanContext {
@@ -148,20 +151,33 @@ function exerciseSlots(ctx: PlanContext): Slots | null {
 }
 
 /**
- * The next school-run departure and the cleanest daytime window on that same local day,
- * found with the same rule as the report's best window (windows.ts).
+ * The next school-run departure and whichever of the hour before and the hour after it, on the
+ * same local day, has less PM2.5. A family can leave an hour earlier or later; it cannot move
+ * the school day by several hours. Null without PM2.5 readings to compare.
  */
 function schoolRunSlots(ctx: PlanContext): Slots | null {
   const { commute, household } = ctx.profile;
   if (!commute || household.children <= 0) return null;
-  const usual = indexOfLocalHour(ctx.report, commute.departHour);
-  if (usual < 0) return null;
-  const dayStart = Math.max(0, usual - commute.departHour);
-  const dayHours = ctx.report.hourly.slice(dayStart, usual - commute.departHour + 24);
-  const bestWindow = findWindows(dayHours).find((w) => w.kind === 'best');
-  if (!bestWindow) return null;
-  const best = indexOfTime(ctx.report, bestWindow.start);
-  return best < 0 ? null : { usual, best, bestWindow };
+  const { report } = ctx;
+  const usual = indexOfLocalHour(report, commute.departHour);
+  const date = report.hourly[usual]?.time.slice(0, 10);
+  if (date === undefined || (report.pm25[usual] ?? null) === null) return null;
+
+  let best = -1;
+  for (const i of [usual - 1, usual + 1]) {
+    const pm = report.pm25[i] ?? null;
+    if (report.hourly[i]?.time.slice(0, 10) !== date || pm === null) continue;
+    const bestPm = report.pm25[best] ?? null;
+    if (bestPm === null || pm < bestPm) best = i;
+  }
+  const reading = report.hourly[best];
+  if (!reading) return null;
+  const end = new Date(Date.parse(`${reading.time}:00Z`) + HOUR_MS).toISOString().slice(0, 16);
+  return {
+    usual,
+    best,
+    bestWindow: { kind: 'best', start: reading.time, end, meanAqi: reading.aqi },
+  };
 }
 
 /**
@@ -176,6 +192,12 @@ function worthMoving(ctx: PlanContext, slots: Slots | null): boolean {
   const before = ctx.report.pm25[slots.usual] ?? null;
   const after = ctx.report.pm25[slots.best] ?? null;
   return before === null || after === null || after < before;
+}
+
+/** "tomorrow 07:00": the day and clock time of a report hour, since either may fall tomorrow. */
+function whenText(ctx: PlanContext, i: number): string {
+  const time = ctx.report.hourly[i]?.time ?? '';
+  return `${dayWord(time, ctx.report)} ${clockTime(time)}`;
 }
 
 /**
@@ -199,16 +221,12 @@ function movedExposureImpact(
     { conc: before, rate, minutes },
     { conc: after, rate, minutes },
   );
-  const when = (i: number): string => {
-    const time = ctx.report.hourly[i]?.time ?? '';
-    return `${dayWord(time, ctx.report)} ${clockTime(time)}`;
-  };
   const [beforeInput, afterInput] = impact.inputs;
   return {
     ...impact,
     inputs: [
-      { label: `Before, ${when(slots.usual)}`, value: beforeInput?.value ?? '' },
-      { label: `After, ${when(slots.best)}`, value: afterInput?.value ?? '' },
+      { label: `Before, ${whenText(ctx, slots.usual)}`, value: beforeInput?.value ?? '' },
+      { label: `After, ${whenText(ctx, slots.best)}`, value: afterInput?.value ?? '' },
     ],
     assumptions: [...impact.assumptions, ...assumptions],
   };
@@ -230,20 +248,27 @@ function moveExerciseImpact(ctx: PlanContext): Impact | null {
 }
 
 function schoolRunImpact(ctx: PlanContext): Impact | null {
-  return movedExposureImpact(
-    ctx,
-    schoolRunSlots(ctx),
-    'Time the school run for the cleanest daytime hours',
-    INHALATION_M3_PER_MIN.child.light,
-    1,
-    [
-      'Uses the forecast PM2.5 for the hour you usually leave and for the first hour of that day’s cleanest daytime hours, for a child of 6 to 11 walking or sitting at light effort.',
-      'Compared per minute outside, so the percentage is the same for any trip length, as long as the trip takes as long both times.',
-    ],
+  const slots = schoolRunSlots(ctx);
+  if (!slots) return null;
+  const before = ctx.report.pm25[slots.usual] ?? null;
+  const after = ctx.report.pm25[slots.best] ?? null;
+  if (before === null || after === null || !(before > 0)) return null;
+  const shift = slots.best < slots.usual ? 'earlier' : 'later';
+  const impact = sameTripExposureImpact(
+    `Leave an hour ${shift} for the school run`,
+    { label: `Usual departure (${whenText(ctx, slots.usual)})`, conc: before },
+    { label: `An hour ${shift} (${whenText(ctx, slots.best)})`, conc: after },
   );
+  return {
+    ...impact,
+    assumptions: [
+      ...impact.assumptions,
+      'Uses the forecast PM2.5 for the hour you usually leave and for the hour before or after it on the same day, whichever is lower.',
+    ],
+  };
 }
 
-/** Local ISO start of the school run's cleaner window, when moving it is worthwhile. */
+/** Local ISO time of the cleaner hour next to the usual school-run departure, when worth it. */
 export function schoolRunStart(ctx: PlanContext): string | undefined {
   const slots = schoolRunSlots(ctx);
   return worthMoving(ctx, slots) ? slots?.bestWindow.start : undefined;
