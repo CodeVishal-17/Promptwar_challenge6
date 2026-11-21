@@ -6,7 +6,7 @@ describe('loadConfig', () => {
     expect(loadConfig({})).toEqual({
       port: 8080,
       geminiApiKey: null,
-      geminiModel: 'gemini-2.5-flash',
+      geminiModel: 'gemini-3.5-flash-lite',
       trustProxy: 0,
     });
   });

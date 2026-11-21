@@ -72,6 +72,8 @@ screen is computed in code first, and the model may only repeat numbers it was g
   validation, the rule-based planner (`server/src/domain/planner.ts`) builds the same kind of plan
   from the catalogue, and the page says "AI summary unavailable — showing our standard plan."
   A question in the same situation (8 s limit) gets a fixed reply marked as a standard answer.
+  A momentary server error from Google (HTTP 5xx) is retried once after 300 ms inside the same
+  time limit; a 4xx such as a bad key, retired model or used-up quota is not retried.
 - The guard is a safety net against invented figures, not a proof of correctness. Its known
   limits (number words, signs, which unit a number is attached to) are written down in
   `numberGuard.ts`.
@@ -135,8 +137,8 @@ deploy behind that many proxies.
   has an 8 s timeout (`server/src/services/openMeteo.ts`).
 - **Errors and logs leak nothing.** Errors map to short JSON codes, and only the error's name is
   logged, never a stack trace, a profile or a question (`server/src/middleware/errors.ts`). A
-  failed Gemini call logs one `gemini_failed` line with the error's name, so a bad key, quota or
-  model id is visible on the server (`server/src/services/gemini.ts`).
+  failed Gemini call logs one `gemini_failed` line with the error's name and HTTP status, so a bad
+  key, quota or model id is visible on the server (`server/src/services/gemini.ts`).
 - **The profile stays in the browser.** It lives in `localStorage` and is never stored on the
   server. Coordinates are rounded to 2 decimals before they leave the browser.
 - **The profile form says what is shared.** A notice explains that the Gemini free tier may use
@@ -253,12 +255,12 @@ For a production build, run `npm run build`, then `npm start`, and open `http://
 
 All settings are environment variables, read only in `server/src/config.ts`. See `.env.example`.
 
-| Variable         | Default            | Meaning                                                                                                                                                                                            |
-| ---------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GEMINI_API_KEY` | empty              | Google AI Studio key. Leave it empty to use the rule-based plan only.                                                                                                                              |
-| `GEMINI_MODEL`   | `gemini-2.5-flash` | Gemini model id                                                                                                                                                                                    |
-| `PORT`           | `8080`             | HTTP port                                                                                                                                                                                          |
-| `TRUST_PROXY`    | `0`                | How many reverse-proxy hops sit in front of the app. Set it to `1` behind a single load balancer. Keep it `0` when clients connect directly; otherwise they can fake their IP to the rate limiter. |
+| Variable         | Default                 | Meaning                                                                                                                                                                                            |
+| ---------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY` | empty                   | Google AI Studio key. Leave it empty to use the rule-based plan only.                                                                                                                              |
+| `GEMINI_MODEL`   | `gemini-3.5-flash-lite` | Gemini model id. Pick a fast Flash-Lite model: plans give up after 10 s and questions after 8 s.                                                                                                   |
+| `PORT`           | `8080`                  | HTTP port                                                                                                                                                                                          |
+| `TRUST_PROXY`    | `0`                     | How many reverse-proxy hops sit in front of the app. Set it to `1` behind a single load balancer. Keep it `0` when clients connect directly; otherwise they can fake their IP to the rate limiter. |
 
 ## Limits
 

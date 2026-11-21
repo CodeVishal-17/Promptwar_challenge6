@@ -7,7 +7,8 @@ export interface Config {
 }
 
 const DEFAULT_PORT = 8080;
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+/** Fast enough for the 8–10 s AI budget on the free tier; `gemini-2.5-flash` is closed to new keys. */
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 
 function parsePort(raw: string | undefined): number {
   const port = Number(raw);
