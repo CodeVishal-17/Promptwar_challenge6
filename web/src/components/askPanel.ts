@@ -6,7 +6,7 @@ export const MAX_QUESTION = 500;
 export const DISCLAIMER = 'General guidance, not medical advice.';
 /** Free text leaves the browser, so say where it goes right where it is typed. */
 export const ASK_PRIVACY =
-  "Questions you type are sent to Google Gemini to answer. Don't include personal details.";
+  "Questions you type are sent to Google Gemini, whose free tier may use them to improve Google products. Don't include personal details.";
 export const NO_PLACE = 'Choose a place first.';
 export const RATE_LIMITED = "You've asked a lot in a short time — please wait a few minutes.";
 export const GENERIC_ERROR = "Sorry, I couldn't answer that just now. Please try again.";

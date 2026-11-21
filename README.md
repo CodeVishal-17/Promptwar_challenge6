@@ -21,7 +21,7 @@ tested TypeScript, never from the model. You can also ask follow-up questions ab
 | GenAI-powered assistant                               | Gemini chooses and orders the day's actions from a pre-filtered catalogue, writes a "why this matters for you" for each one and a day summary, and answers follow-up questions. It returns structured JSON that must match a response schema.                                                                          | `server/src/services/planService.ts`, `askService.ts`, `gemini.ts`, `web/src/components/askPanel.ts`       |
 | helps families and communities                        | The household profile records adults, children under 12, adults over 65, pregnancy, and lung or heart conditions. Sensitive households get extra EPA/AirNow health lines and child-specific actions such as timing the school run. One action asks people to share what they have learned with their street or school. | `web/src/components/profileForm.ts`, `server/src/domain/health.ts`, `server/src/domain/catalog.ts`         |
 | navigate severe winter smog and urban air pollution   | Live US AQI from PM2.5, PM10, ozone and NO₂, a 48-hour bar chart with the cleanest daytime and the worst two-hour windows, a table view, and a daily outlook. The AQI is not capped at 500, so very severe smog reads as it really is.                                                                                 | `server/src/domain/aqi.ts`, `report.ts`, `windows.ts`, `web/src/components/aqiCard.ts`, `forecastChart.ts` |
-| low-emission daily routines                           | A "low-emission routine" section: move or re-time exercise to the cleanest window, keep errands out of the smoggiest hours, time the school run from your usual departure hour, wear an N95/FFP2 outdoors. A time on another day says "Tomorrow" or the weekday.                                                       | `server/src/domain/catalog.ts` (section `routine`), `planner.ts`                                           |
+| low-emission daily routines                           | A "low-emission routine" section: move or re-time exercise to the cleanest window, keep errands out of the smoggiest hours, leave for the school run an hour earlier or later when that hour is cleaner, wear an N95/FFP2 outdoors. A time on another day says "Tomorrow" or the weekday.                              | `server/src/domain/catalog.ts` (section `routine`), `planner.ts`                                           |
 | indoor air quality hacks                              | An "Indoor air" section: keep windows shut while the air is bad, run a purifier, build a box-fan cleaner, set up one clean room, vent while cooking, air out at the cleanest hour.                                                                                                                                     | `catalog.ts` (section `indoor`), `server/src/domain/impact/indoor.ts`                                      |
 | sustainable alternatives                              | A "Greener swaps" section: switch commute mode, never burn waste, cleaner cooking and heating fuels, combine trips, share rides.                                                                                                                                                                                       | `catalog.ts` (section `sustainable`), `server/src/domain/impact/commute.ts`                                |
 | tailored to their location                            | Air, forecast windows and local times are for the chosen coordinates and time zone. The country sets the grid carbon intensity used for electric cars and rail (213 countries plus a world average).                                                                                                                   | `server/src/services/openMeteo.ts`, `server/src/domain/data/gridIntensity.json`                            |
@@ -102,7 +102,7 @@ cell it was taken from.
 | Figure                                                                                              | Formula                                                                | Source                                                                                                                                                                                                                                                                                                                |
 | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Commute CO₂e saved per year (`impact/commute.ts`)                                                   | one-way km × 2 trips × 5 days × 46 weeks × (kg CO₂e/km before − after) | Fuel modes: UK DESNZ GHG Conversion Factors 2026, tailpipe plus well-to-tank. Electric car and rail: DESNZ kWh per km × the country's lifecycle grid intensity from Our World in Data, based on Ember (CC BY 4.0). Bus and rail are per passenger-km at UK average occupancy (the DESNZ basis), and the chip says so. |
-| % change in PM2.5 inhaled (`impact/exposure.ts`)                                                    | concentration × inhalation rate × minutes, before and after            | US EPA Exposure Factors Handbook 2011, chapter 6, Table 6-2 (mean short-term inhalation rates by age and activity); used for moving exercise and for timing the school run (child, light effort)                                                                                                                      |
+| % change in PM2.5 inhaled (`impact/exposure.ts`)                                                    | concentration × inhalation rate × minutes, before and after            | US EPA Exposure Factors Handbook 2011, chapter 6, Table 6-2 (mean short-term inhalation rates by age and activity); the school run compares PM2.5 at the hour either side of departure, where rate and minutes cancel                                                                                                 |
 | % less indoor PM2.5 with a purifier, and indoors vs outdoors with windows shut (`impact/indoor.ts`) | steady-state mass balance C_in = P·a·C_out / (a + k + CADR/V)          | Xiang et al. 2021 (air exchange 0.53/h, deposition 0.26/h, penetration 0.97); default room and purifier size from the US EPA Guide to Air Cleaners in the Home                                                                                                                                                        |
 | Health advice per AQI category (`health.ts`)                                                        | static table, with extra lines for sensitive groups                    | AirNow, Air Quality Guide for Particle Pollution                                                                                                                                                                                                                                                                      |
 
@@ -141,7 +141,8 @@ deploy behind that many proxies.
   server. Coordinates are rounded to 2 decimals before they leave the browser.
 - **The profile form says what is shared.** A notice explains that the Gemini free tier may use
   prompts to improve Google products. The Q&A box says that typed questions are sent to Google
-  Gemini and asks people not to include personal details.
+  Gemini, whose free tier may use them to improve Google products, and asks people not to include
+  personal details.
 
 ## Efficiency
 
@@ -168,8 +169,8 @@ Clearday targets WCAG 2.2 AA:
 - **Live announcements.** A polite live region announces loaded air, plans and answers.
 - **Not colour alone.** The AQI is a number, a text category and a colour. The chart has a text
   description, labelled cleanest daytime and worst windows, and a data table you can toggle.
-  Every bar has a neutral outline, so even the pale Good and Moderate bars reach 3:1 against the
-  card (WCAG 1.4.11).
+  Every bar has a neutral outline that reaches 3:1 against the card, so even the pale Good and
+  Moderate bars stay visible (WCAG 1.4.11).
 - **Visible focus and touch targets.** Focus rings are a visible 3 px. Buttons, impact chips and
   form fields are at least 40 px tall, well above the 24 px WCAG 2.2 minimum.
 - **Display preferences.** Light and dark themes follow the system, motion is dropped when the
@@ -189,10 +190,10 @@ Clearday targets WCAG 2.2 AA:
 ## Testing
 
 ```
-npm run test:coverage   # 478 tests in 37 files; 96.5% statements, 98.2% lines, 89.9% branches
+npm run test:coverage   # 486 tests in 37 files; 96.5% statements, 98.2% lines, 90.0% branches
 ```
 
-Vitest runs two projects (`vitest.config.ts`): `server` in Node (277 tests) and `web` in jsdom
+Vitest runs two projects (`vitest.config.ts`): `server` in Node (285 tests) and `web` in jsdom
 (201 tests). CI fails if line coverage drops below 80%.
 
 - **Domain.** The AQI, unit conversion, windows, every impact calculator against hand-checked

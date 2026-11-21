@@ -355,7 +355,11 @@ describe('sustainable actions', () => {
     expect(byId('combine-trips').defaultWhy).not.toMatch(/cold start/i);
     expect(byId('no-waste-burning').defaultWhy).not.toMatch(/still|evening/i);
     expect(byId('keep-low-emission-commute').defaultWhy).not.toMatch(/little or no/i);
-    expect(byId('keep-low-emission-commute').defaultWhy).toMatch(/far less exhaust per person/);
+    // DESNZ: average bus 0.128 kg CO₂e per passenger-km vs 0.2075 for a solo petrol car, ≈38% less.
+    expect(byId('keep-low-emission-commute').defaultWhy).toMatch(
+      /less exhaust per person than driving alone/,
+    );
+    expect(byId('keep-low-emission-commute').defaultWhy).not.toMatch(/far less/);
   });
   it('electrify-heating is offered for wood or coal heating only, not gas', () => {
     const a = byId('electrify-heating');

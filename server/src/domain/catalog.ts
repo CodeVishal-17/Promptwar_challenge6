@@ -564,7 +564,7 @@ export const ACTIONS: readonly Action[] = [
     section: 'sustainable',
     title: 'Keep up your low-emission commute',
     defaultWhy:
-      'Bikes, walking and electric cars add no tailpipe exhaust to your street, and a bus or train carries many people for far less exhaust per person than a car. Your commute is already helping, so hold on to it.',
+      'Bikes, walking and electric cars add no tailpipe exhaust to your street, and a bus or train means less exhaust per person than driving alone. Your commute is already helping, so hold on to it.',
     priority: 45,
     applies: commuteIn(LOW_EMISSION_MODES),
     sources: [DESNZ_2026, WHO_AMBIENT_AIR],

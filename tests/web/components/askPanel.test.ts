@@ -50,7 +50,7 @@ describe('askPanel', () => {
     const { textarea } = mount(resolved());
     const notice = root.querySelector('.ask__privacy');
     expect(notice?.textContent).toBe(
-      "Questions you type are sent to Google Gemini to answer. Don't include personal details.",
+      "Questions you type are sent to Google Gemini, whose free tier may use them to improve Google products. Don't include personal details.",
     );
     const described = (textarea.getAttribute('aria-describedby') ?? '').split(' ');
     expect(described).toContain(notice?.id);

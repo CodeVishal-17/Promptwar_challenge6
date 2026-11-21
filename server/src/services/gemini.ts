@@ -1,14 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 
 /** The one seam to the AI model: structured JSON in, parsed JSON out. Tests swap in a fake. */
-/**
- * One line when a Gemini call fails, so a wrong key, quota or model id is visible on the server.
- * Only the error's name is logged: never its message, the prompt, the question or the profile.
- */
-export function logGeminiFailure(err: unknown): void {
-  console.warn('gemini_failed', err instanceof Error && err.name ? err.name : 'unknown');
-}
-
 export interface GeminiClient {
   generateJson(req: {
     system: string;
@@ -17,6 +9,14 @@ export interface GeminiClient {
     schema: object;
     timeoutMs: number;
   }): Promise<unknown>;
+}
+
+/**
+ * One line when a Gemini call fails, so a wrong key, quota or model id is visible on the server.
+ * Only the error's name is logged: never its message, the prompt, the question or the profile.
+ */
+export function logGeminiFailure(err: unknown): void {
+  console.warn('gemini_failed', err instanceof Error && err.name ? err.name : 'unknown');
 }
 
 /** The slice of the SDK this module uses, so a test can stub it. */
