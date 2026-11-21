@@ -1,31 +1,47 @@
 /*
- * Clearday design tokens. Calm neutrals carry the interface; the six EPA AQI colours are the only
- * strong colours, and they appear only as swatches and bands — never as text or behind text.
+ * Clearday design tokens. One bright theme for everyone: a deep-teal band (header and hero) over a
+ * warm cream page with white cards, sky-teal links and sunny-yellow highlights. The six EPA AQI
+ * colours appear only as swatches and bands — never as text or behind text.
  *
  * Contrast (WCAG 2.2, checked with the relative-luminance formula):
- *   light  text 16.5:1 on surface · muted 7.1:1 · link 7.3:1 · border-strong 3.5:1 · focus 7.3:1
- *   dark   text 14.3:1 on surface · muted 7.3:1 · link 8.7:1 · border-strong 3.4:1 · focus 8.7:1
- * Every text pair is at least 5.9:1 on every surface it can sit on (bg, surface, sunken, accent-soft).
+ *   page  text 14.7:1 on surface · muted 6.8:1 · link 6.8:1 · border-strong 4.2:1 · focus 6.8:1
+ *   band  text 9.8:1 · muted 7.6:1 · sun (focus, links) 6.8:1 · coral (errors) 5.8:1
+ *   dark text on a sun button 10.2:1
+ * Every page text pair is at least 5.9:1 on every surface it can sit on (bg, surface, sunken,
+ * accent-soft, sun-soft).
  */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
-  /* Neutrals — light */
-  --color-bg: #f5f7f9;
+  /* Page */
+  --color-bg: #fbf8f1;
   --color-surface: #ffffff;
-  --color-sunken: #eef2f5;
-  --color-border: #dce2e8;
-  --color-border-strong: #7d8b99;
-  --color-text: #14202b;
-  --color-text-muted: #4c5a68;
-  --color-accent: #1d5a8c;
-  --color-accent-soft: #e7eff7;
+  --color-sunken: #f5f0e5;
+  --color-border: #e8e0d0;
+  --color-border-strong: #857b6c;
+  --color-text: #1b2a33;
+  --color-text-muted: #4f5d68;
+  --color-accent: #0a6283;
+  --color-accent-soft: #e4f2f6;
   --color-danger: #a4332a;
-  --color-focus: #1d5a8c;
+  --color-focus: #0a6283;
   --color-on-inverse: #ffffff;
-  --color-skeleton: #e6ebf0;
-  --color-skeleton-shine: #f3f6f8;
-  --color-swatch-ring: rgb(20 32 43 / 0.18);
+  --color-skeleton: #efe9dc;
+  --color-skeleton-shine: #f8f4ec;
+  --color-swatch-ring: rgb(27 42 51 / 0.18);
+
+  /* Sunny highlights: fills and chips only, never as text on a light surface. */
+  --color-sun: #ffd166;
+  --color-sun-soft: #fff3cf;
+
+  /* The deep-teal band behind the header and hero, and what sits on it. */
+  --band-bg: #0e4a59;
+  --band-glow: rgb(255 209 102 / 0.16);
+  --band-text: #ffffff;
+  --band-text-muted: #cfe7ec;
+  --band-accent: #ffd166;
+  --band-danger: #ffb4a8;
+  --band-line: rgb(255 255 255 / 0.14);
 
   /* EPA AQI category colours (US EPA Technical Assistance Document, 2024). Swatches and bands only. */
   --aqi-good: #00e400;
@@ -76,9 +92,9 @@
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-pill: 999px;
-  --shadow-sm: 0 1px 2px rgb(20 32 43 / 0.06), 0 1px 1px rgb(20 32 43 / 0.04);
-  --shadow-md: 0 4px 12px rgb(20 32 43 / 0.08), 0 1px 3px rgb(20 32 43 / 0.06);
-  --shadow-lg: 0 12px 32px rgb(20 32 43 / 0.12), 0 2px 6px rgb(20 32 43 / 0.06);
+  --shadow-sm: 0 1px 2px rgb(60 45 20 / 0.06), 0 1px 1px rgb(60 45 20 / 0.04);
+  --shadow-md: 0 4px 12px rgb(60 45 20 / 0.08), 0 1px 3px rgb(60 45 20 / 0.06);
+  --shadow-lg: 0 12px 32px rgb(60 45 20 / 0.12), 0 2px 6px rgb(60 45 20 / 0.06);
 
   /* Interaction */
   --target-min: 2.75rem; /* 44 px: above the 24 px WCAG 2.2 minimum */
@@ -87,31 +103,6 @@
   --duration-fast: 120ms;
   --duration: 200ms;
   --ease: cubic-bezier(0.2, 0, 0, 1);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #0e1419;
-    --color-surface: #151d24;
-    --color-sunken: #1b252e;
-    --color-border: #26323d;
-    --color-border-strong: #61717f;
-    --color-text: #e6ecf1;
-    --color-text-muted: #9dabb8;
-    --color-accent: #8dbdf0;
-    --color-accent-soft: #1d2e3f;
-    --color-danger: #f0928a;
-    --color-focus: #8dbdf0;
-    --color-on-inverse: #0e1419;
-    --color-skeleton: #1d2730;
-    --color-skeleton-shine: #26313b;
-    --color-swatch-ring: rgb(230 236 241 / 0.28);
-    --aqi-none: #4a5864;
-
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow-md: 0 4px 14px rgb(0 0 0 / 0.45), 0 1px 3px rgb(0 0 0 / 0.3);
-    --shadow-lg: 0 14px 36px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.35);
-  }
 }
 
 /* Maps a category name on any element to its EPA colour, for swatches and bands. */

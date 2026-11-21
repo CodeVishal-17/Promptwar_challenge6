@@ -279,6 +279,28 @@ describe('use my location', () => {
     expect(onPick).not.toHaveBeenCalled();
   });
 
+  // GeolocationPositionError codes: 1 PERMISSION_DENIED, 2 POSITION_UNAVAILABLE, 3 TIMEOUT.
+  it.each([
+    [1, /blocked for this site.*site settings/],
+    [2, /couldn't work out where you are.*location is turned on/],
+    [3, /took too long.*Try again/],
+  ])(
+    'says what went wrong for geolocation error code %i, and how to fix it',
+    async (code, text) => {
+      mount(async () => {
+        throw { code, message: 'from the browser' };
+      });
+      locateButton().click();
+      await vi.advanceTimersByTimeAsync(0);
+      const message = root.querySelector('.location-search__message');
+      expect(message?.textContent).toMatch(text);
+      expect(message?.textContent).toMatch(/search for your city/);
+      expect(message?.getAttribute('data-tone')).toBe('error');
+      expect(statusText()).toBe(message?.textContent);
+      expect(onPick).not.toHaveBeenCalled();
+    },
+  );
+
   it('shows that it is locating while it waits, keeps focus, and ignores repeat clicks', () => {
     const geolocate = vi.fn(() => new Promise<{ lat: number; lon: number }>(() => {}));
     mount(geolocate);

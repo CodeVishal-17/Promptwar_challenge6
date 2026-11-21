@@ -6,12 +6,76 @@
   flex-shrink: 0;
 }
 
-/* ---------- Header and brand ---------- */
+/* ---------- The deep-teal band: header and hero ---------- */
+
+/*
+ * The header and hero share one dark band. Inside it the text tokens are re-pointed at the band
+ * colours, so every component placed there (labels, messages, focus rings) stays readable
+ * without its own dark-band rules.
+ */
+.site-header,
+.hero {
+  --color-text: var(--band-text);
+  --color-text-muted: var(--band-text-muted);
+  --color-accent: var(--band-accent);
+  --color-focus: var(--band-accent);
+  --color-danger: var(--band-danger);
+  --color-border: var(--band-line);
+
+  background-color: var(--band-bg);
+  color: var(--color-text);
+}
 
 .site-header {
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border-bottom: 1px solid var(--band-line);
 }
+
+/* A soft sun glow in the corner of the hero: decoration only, kept clear of the text column. */
+.hero {
+  background-image: radial-gradient(
+    circle at 100% 100%,
+    var(--band-glow) 0,
+    var(--band-glow) 9rem,
+    transparent 22rem
+  );
+}
+
+/*
+ * The search field and its suggestions are white cards on the band, so they switch the tokens
+ * back to the page palette.
+ */
+.hero .combobox {
+  --color-text: #1b2a33;
+  --color-text-muted: #4f5d68;
+  --color-accent: #0a6283;
+  --color-focus: var(--band-accent);
+  --color-border: #e8e0d0;
+
+  color: var(--color-text);
+}
+
+.hero .combobox__input {
+  border-color: transparent;
+  box-shadow: var(--shadow-md);
+}
+
+.hero .combobox__input:hover {
+  border-color: transparent;
+  box-shadow: var(--shadow-lg);
+}
+
+/* Use my location: a sunny button with dark text. */
+.hero .locate-button {
+  border-color: transparent;
+  background: var(--color-sun);
+  color: #1b2a33;
+}
+
+.hero .locate-button:hover {
+  background: #ffdc85;
+}
+
+/* ---------- Header and brand ---------- */
 
 .site-header__inner {
   display: flex;
@@ -40,7 +104,7 @@
 }
 
 .brand__sun {
-  fill: var(--color-accent);
+  fill: var(--color-sun);
 }
 
 .brand__breeze {
@@ -80,6 +144,13 @@
 .intro {
   display: grid;
   gap: var(--space-3);
+  padding-block: var(--space-6) var(--space-7);
+}
+
+@media (min-width: 48rem) {
+  .intro {
+    padding-block: var(--space-7) var(--space-8);
+  }
 }
 
 .intro__title {
@@ -106,6 +177,17 @@
 
 .section__title {
   font-size: var(--text-xl);
+}
+
+/* A short sunny underline under each section heading: decoration only. */
+.section__title::after {
+  content: '';
+  display: block;
+  width: 2.5rem;
+  height: 4px;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-sun);
 }
 
 .card {
@@ -147,7 +229,7 @@
 }
 
 .btn--primary {
-  background: var(--color-text);
+  background: var(--band-bg);
   color: var(--color-on-inverse);
 }
 
@@ -627,8 +709,8 @@
   margin-bottom: var(--space-2);
   padding: 0.9rem;
   border-radius: var(--radius-pill);
-  background: var(--color-sunken);
-  color: var(--color-text-muted);
+  background: var(--color-sun-soft);
+  color: var(--color-accent);
 }
 
 .empty-state__title {

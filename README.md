@@ -175,8 +175,15 @@ Clearday targets WCAG 2.2 AA:
   Moderate bars stay visible (WCAG 1.4.11).
 - **Visible focus and touch targets.** Focus rings are a visible 3 px. Buttons, impact chips and
   form fields are at least 40 px tall, well above the 24 px WCAG 2.2 minimum.
-- **Display preferences.** Light and dark themes follow the system, motion is dropped when the
-  system asks for reduced motion, and the layout works from 320 px wide.
+- **One bright theme, checked for contrast.** A deep-teal header and hero sit over a warm cream
+  page with white cards. Inside the band the text tokens switch to white, pale teal and sunny
+  yellow, so labels, messages and focus rings there keep at least 5.8:1. Sunny yellow is used for
+  fills and highlights, never as text on a light surface.
+- **Display preferences.** Motion is dropped when the system asks for reduced motion, and the
+  layout works from 320 px wide.
+- **Location errors say how to fix them.** If "Use my location" fails, the message says whether
+  access is blocked (with a pointer to site settings), the position is unavailable, or the request
+  timed out.
 - **Automated checks.** `tests/web/a11y.test.ts` renders the real page with fixture data in jsdom
   and runs axe-core with the `wcag2a`, `wcag2aa`, `wcag21aa` and `wcag22aa` tags. It covers the
   empty page, the full report with the table open, an open impact panel, every step of the
@@ -184,10 +191,12 @@ Clearday targets WCAG 2.2 AA:
   violations. Colour contrast and target size need a real layout engine, so those two rules are
   run in a real browser instead.
 
-  The last browser pass (Chromium, at 320 px, 375 px and desktop width, light and dark, with the
-  dialog, the table and every impact panel open) found zero violations, including contrast. Where
-  axe could not judge contrast on its own (text over the AQI card's colour stripe, or rows
-  scrolled out of the table's view), the ratio was measured directly; the lowest was 7.07:1.
+  An earlier browser pass (Chromium, at 320 px, 375 px and desktop width, with the dialog, the
+  table and every impact panel open) found zero violations, including contrast. Where axe could
+  not judge contrast on its own (text over the AQI card's colour stripe, or rows scrolled out of
+  the table's view), the ratio was measured directly. After the switch to the bright theme, every
+  visible text element on a full report (164 of them, band included) was measured again in
+  Chromium, and all reach WCAG AA.
 
 ## Testing
 

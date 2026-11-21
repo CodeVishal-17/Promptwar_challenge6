@@ -9,6 +9,18 @@ const MIN_QUERY = 2;
 const MAX_QUERY = 80;
 const LOCATE_LABEL = 'Use my location';
 const GEO_FAILED = "Couldn't get your location — search for your city instead.";
+/** Keyed by GeolocationPositionError.code, so each failure says how to fix it. */
+const GEO_MESSAGES: Record<number, string> = {
+  1: "Location access is blocked for this site. Allow it in your browser's site settings, or search for your city.",
+  2: "Your device couldn't work out where you are. Check that location is turned on, or search for your city.",
+  3: 'Finding your location took too long. Try again, or search for your city.',
+};
+
+/** The message for a failed geolocation: specific for the browser's error codes, general otherwise. */
+function geoErrorMessage(err: unknown): string {
+  const code = (err as { code?: unknown } | null | undefined)?.code;
+  return (typeof code === 'number' && GEO_MESSAGES[code]) || GEO_FAILED;
+}
 const NO_RESULTS = 'No places found. Check the spelling, or try a nearby larger city.';
 
 interface Deps {
@@ -273,9 +285,10 @@ export function mountLocationSearch(
         lat: round2(lat),
         lon: round2(lon),
       });
-    } catch {
-      setMessage(GEO_FAILED, 'error');
-      announce(GEO_FAILED);
+    } catch (err) {
+      const text = geoErrorMessage(err);
+      setMessage(text, 'error');
+      announce(text);
     } finally {
       locating = false;
       locate.removeAttribute('aria-disabled');
