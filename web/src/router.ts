@@ -78,6 +78,8 @@ export function startRouter(opts: { placeName: () => string | null }): Router {
       apply(moveFocus);
     },
     refresh: title,
-    stop: () => window.removeEventListener('hashchange', onHashChange),
+    stop: () => {
+      window.removeEventListener('hashchange', onHashChange);
+    },
   };
 }

@@ -72,38 +72,63 @@ function house(): SVGElement {
   );
 }
 
-function parts(mood: Mood): SVGElement[] {
-  const out: SVGElement[] = [];
-  if (mood === 'good' || mood === 'cheer') out.push(SPARKLE(14, 18), SPARKLE(100, 14));
-  if (mood === 'wave') out.push(svg('path', { class: 'puff__arm', d: 'M92 62q12-4 15-18' }));
-  if (mood === 'cheer') {
-    out.push(
-      svg('path', { class: 'puff__arm', d: 'M28 62q-12-4-15-18' }),
-      svg('path', { class: 'puff__arm', d: 'M92 62q12-4 15-18' }),
-    );
-  }
-  out.push(svg('path', { class: 'puff__body', d: BODY }), ...eyes(mood));
-  out.push(
-    svg('circle', { class: 'puff__cheek', cx: '40', cy: '67', r: '4' }),
-    svg('circle', { class: 'puff__cheek', cx: '80', cy: '67', r: '4' }),
+/** Moods that earn a grin and sparkles, a full mask, or a retreat indoors. */
+const HAPPY: ReadonlySet<Mood> = new Set(['good', 'cheer']);
+const MASKED: ReadonlySet<Mood> = new Set(['unhealthy', 'very_unhealthy', 'hazardous']);
+const INDOORS: ReadonlySet<Mood> = new Set(['very_unhealthy', 'hazardous']);
+
+const arm = (d: string): SVGElement => svg('path', { class: 'puff__arm', d });
+const RIGHT_ARM = 'M92 62q12-4 15-18';
+const LEFT_ARM = 'M28 62q-12-4-15-18';
+
+function arms(mood: Mood): SVGElement[] {
+  if (mood === 'wave') return [arm(RIGHT_ARM)];
+  if (mood === 'cheer') return [arm(LEFT_ARM), arm(RIGHT_ARM)];
+  return [];
+}
+
+function cheeks(): SVGElement[] {
+  return [40, 80].map((cx) =>
+    svg('circle', { class: 'puff__cheek', cx: String(cx), cy: '67', r: '4' }),
   );
-  if (mood === 'hazardous') {
-    out.push(
-      svg('path', { class: 'puff__brow', d: 'M43 51l9-3' }),
-      svg('path', { class: 'puff__brow', d: 'M77 51l-9-3' }),
-    );
-  }
-  const masked = mood === 'unhealthy' || mood === 'very_unhealthy' || mood === 'hazardous';
-  if (masked) out.push(mask('on'));
-  else out.push(mouth(mood === 'good' || mood === 'cheer' ? 'grin' : 'smile'));
-  if (mood === 'usg') out.push(mask('chin'));
-  if (mood === 'very_unhealthy' || mood === 'hazardous') out.push(house());
-  if (mood === 'none') {
-    const z = svg('text', { class: 'puff__z', x: '94', y: '32' });
-    z.textContent = 'z';
-    out.push(z);
-  }
-  return out;
+}
+
+/** Frowning brows, only when the air is hazardous. */
+function brows(mood: Mood): SVGElement[] {
+  if (mood !== 'hazardous') return [];
+  return [
+    svg('path', { class: 'puff__brow', d: 'M43 51l9-3' }),
+    svg('path', { class: 'puff__brow', d: 'M77 51l-9-3' }),
+  ];
+}
+
+/** A full mask from unhealthy up; otherwise a mouth, with the mask on the chin for sensitive groups. */
+function lowerFace(mood: Mood): SVGElement[] {
+  if (MASKED.has(mood)) return [mask('on')];
+  const face = mouth(HAPPY.has(mood) ? 'grin' : 'smile');
+  return mood === 'usg' ? [face, mask('chin')] : [face];
+}
+
+/** A "z" when there is no reading, so Puff is asleep rather than wrong. */
+function snooze(mood: Mood): SVGElement[] {
+  if (mood !== 'none') return [];
+  const z = svg('text', { class: 'puff__z', x: '94', y: '32' });
+  z.textContent = 'z';
+  return [z];
+}
+
+function parts(mood: Mood): SVGElement[] {
+  return [
+    ...(HAPPY.has(mood) ? [SPARKLE(14, 18), SPARKLE(100, 14)] : []),
+    ...arms(mood),
+    svg('path', { class: 'puff__body', d: BODY }),
+    ...eyes(mood),
+    ...cheeks(),
+    ...brows(mood),
+    ...lowerFace(mood),
+    ...(INDOORS.has(mood) ? [house()] : []),
+    ...snooze(mood),
+  ];
 }
 
 /** Puff as a decorative inline SVG. */
@@ -126,7 +151,11 @@ export const WELCOME_LINE: Line = {
   emoji: '👋',
 };
 
-type Copy = { plain: string; cleaner?: (when: string) => string; emoji: string };
+interface Copy {
+  plain: string;
+  cleaner?: (when: string) => string;
+  emoji: string;
+}
 
 /** What Puff says per category. `when` is "at 16:00", "tomorrow at 07:00" or "on Sunday at 06:00". */
 const COPY: Record<AqiCategory | 'none', Copy> = {

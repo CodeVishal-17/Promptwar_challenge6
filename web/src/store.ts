@@ -15,7 +15,8 @@ const KEYS = {
 
 function storage(): Storage | null {
   try {
-    return window.localStorage ?? null;
+    // Reading the property itself throws where storage is blocked.
+    return window.localStorage;
   } catch {
     return null;
   }
@@ -194,7 +195,7 @@ export function loadDone(key: string): Set<string> {
       if (!Array.isArray(entry.ids) || !entry.ids.every((id) => typeof id === 'string')) {
         throw new Invalid();
       }
-      return new Set(entry.ids as string[]);
+      return new Set<string>(entry.ids);
     },
     () => new Set<string>(),
   );

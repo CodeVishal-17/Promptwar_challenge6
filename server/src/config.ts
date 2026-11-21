@@ -21,12 +21,19 @@ function parseHops(raw: string | undefined): number {
   return raw && /^\d+$/.test(raw) ? Number(raw) : 0;
 }
 
+/** The trimmed value, or null when it is missing or blank. */
+function nonBlank(raw: string | undefined): string | null {
+  const value = raw?.trim();
+  if (!value) return null;
+  return value;
+}
+
 /** The only place environment variables are read; everything else receives plain values. */
 export function loadConfig(env: NodeJS.ProcessEnv): Config {
   return {
     port: parsePort(env.PORT),
-    geminiApiKey: env.GEMINI_API_KEY?.trim() || null,
-    geminiModel: env.GEMINI_MODEL?.trim() || DEFAULT_MODEL,
+    geminiApiKey: nonBlank(env.GEMINI_API_KEY),
+    geminiModel: nonBlank(env.GEMINI_MODEL) ?? DEFAULT_MODEL,
     trustProxy: parseHops(env.TRUST_PROXY),
   };
 }

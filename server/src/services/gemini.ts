@@ -93,11 +93,13 @@ export async function withTimeout<T>(
 export function createGeminiClient(
   apiKey: string,
   model: string,
-  sdk: GenerateSdk = new GoogleGenAI({ apiKey }) as unknown as GenerateSdk,
+  sdk: GenerateSdk = new GoogleGenAI({ apiKey }),
 ): GeminiClient {
   return {
     async generateJson({ system, user, schema, timeoutMs }) {
       const controller = new AbortController();
+      // A function, not a property read: the abort can land while a retry pause is awaited.
+      const aborted = (): boolean => controller.signal.aborted;
       const call = () =>
         sdk.models.generateContent({
           model,
@@ -114,15 +116,15 @@ export function createGeminiClient(
         try {
           return await call();
         } catch (err) {
-          if (!isTransient(err) || controller.signal.aborted) throw err;
+          if (!isTransient(err) || aborted()) throw err;
           await pause(RETRY_DELAY_MS, controller.signal);
-          if (controller.signal.aborted) throw err;
+          if (aborted()) throw err;
           return call();
         }
       };
-      const response = await withTimeout(callWithRetry(), timeoutMs, 'Gemini request', () =>
-        controller.abort(),
-      );
+      const response = await withTimeout(callWithRetry(), timeoutMs, 'Gemini request', () => {
+        controller.abort();
+      });
       if (!response.text) throw new Error('Gemini returned no text');
       return JSON.parse(response.text) as unknown;
     },

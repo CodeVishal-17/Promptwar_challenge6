@@ -204,6 +204,26 @@ function maxOrNull(...candidates: (number | null)[]): number | null {
 
 const POLLUTANT_ORDER: readonly Pollutant[] = ['pm2_5', 'pm10', 'o3', 'no2'];
 
+/** `f(value)`, or null when there is no value. */
+const mapOrNull = (value: number | null, f: (n: number) => number | null): number | null =>
+  value === null ? null : f(value);
+
+/** µg/m³ of ozone to ppm, the unit of its breakpoints. */
+const o3Ppm = (ug: number): number => ugm3ToPpb(ug, 'o3') / 1000;
+
+/** Each pollutant's sub-index for hour `i`, or null where its averaging rule has too little data. */
+function subIndices(s: HourlyConcentrations, i: number): Record<Pollutant, number | null> {
+  return {
+    pm2_5: mapOrNull(nowCast(s.pm2_5, i), (c) => subIndex('pm2_5_24h', c)),
+    pm10: mapOrNull(nowCast(s.pm10, i), (c) => subIndex('pm10_24h', c)),
+    o3: maxOrNull(
+      mapOrNull(trailingMean(s.o3, i, 8, 6), (c) => subIndex('o3_8h', o3Ppm(c))),
+      mapOrNull(validAt(s.o3, i), (c) => subIndex('o3_1h', o3Ppm(c))),
+    ),
+    no2: mapOrNull(validAt(s.no2, i), (c) => subIndex('no2_1h', ugm3ToPpb(c, 'no2'))),
+  };
+}
+
 /**
  * AQI for hour index `i` of an hourly series (concentrations in µg/m³).
  * PM uses the EPA NowCast on the 24-hour breakpoints (as AirNow does for hourly PM), ozone the
@@ -214,24 +234,7 @@ export function computeHourlyAqi(s: HourlyConcentrations, i: number): AqiReading
   const time = s.time[i];
   if (time === undefined) return null;
 
-  const pm25Mean = nowCast(s.pm2_5, i);
-  const pm10Mean = nowCast(s.pm10, i);
-  const o3Mean8 = trailingMean(s.o3, i, 8, 6);
-  const o3Now = validAt(s.o3, i);
-  const no2Now = validAt(s.no2, i);
-
-  const toPpm = (ug: number): number => ugm3ToPpb(ug, 'o3') / 1000;
-
-  const candidates: Record<Pollutant, number | null> = {
-    pm2_5: pm25Mean === null ? null : subIndex('pm2_5_24h', pm25Mean),
-    pm10: pm10Mean === null ? null : subIndex('pm10_24h', pm10Mean),
-    o3: maxOrNull(
-      o3Mean8 === null ? null : subIndex('o3_8h', toPpm(o3Mean8)),
-      o3Now === null ? null : subIndex('o3_1h', toPpm(o3Now)),
-    ),
-    no2: no2Now === null ? null : subIndex('no2_1h', ugm3ToPpb(no2Now, 'no2')),
-  };
-
+  const candidates = subIndices(s, i);
   const perPollutant: Partial<Record<Pollutant, number>> = {};
   let dominant: Pollutant | null = null;
   let aqi = -1;

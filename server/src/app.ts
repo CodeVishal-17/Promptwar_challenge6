@@ -44,7 +44,9 @@ function staticFiles(dir: string): RequestHandler[] {
       return;
     }
     res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(join(dir, 'index.html'), (err) => err && next());
+    res.sendFile(join(dir, 'index.html'), (err) => {
+      if (err) next();
+    });
   };
   return [serve, shell];
 }

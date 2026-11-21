@@ -31,6 +31,40 @@ async function readJson(res: Response): Promise<unknown> {
   }
 }
 
+/** An abort signal that fires on the caller's own signal or after TIMEOUT_MS, whichever comes first. */
+function deadline(caller?: AbortSignal) {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, TIMEOUT_MS);
+  const forward = (): void => {
+    controller.abort();
+  };
+  if (caller?.aborted) controller.abort();
+  caller?.addEventListener('abort', forward, { once: true });
+  return {
+    signal: controller.signal,
+    timedOut: (): boolean => timedOut,
+    dispose: (): void => {
+      clearTimeout(timer);
+      caller?.removeEventListener('abort', forward);
+    },
+  };
+}
+
+/** The JSON object in a response; an error status or any other body becomes an ApiError. */
+async function bodyOf(res: Response): Promise<Record<string, unknown>> {
+  const body = await readJson(res);
+  if (!res.ok) {
+    const code = isObject(body) && typeof body.error === 'string' ? body.error : 'http_error';
+    throw new ApiError(code, res.status);
+  }
+  if (!isObject(body)) throw new ApiError('bad_response', res.status);
+  return body;
+}
+
 /**
  * One same-origin JSON request with a 15 s timeout. A caller's own abort is re-thrown as the
  * AbortError it is (so a superseded search can be ignored); everything else becomes ApiError.
@@ -40,37 +74,21 @@ async function request(
   init: RequestInit = {},
   signal?: AbortSignal,
 ): Promise<unknown> {
-  const controller = new AbortController();
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, TIMEOUT_MS);
-  const forward = () => controller.abort();
-  if (signal?.aborted) controller.abort();
-  signal?.addEventListener('abort', forward, { once: true });
-
+  const limit = deadline(signal);
   try {
     const headers = new Headers(init.headers);
     headers.set('Accept', 'application/json');
     let res: Response;
     try {
-      res = await fetch(path, { ...init, headers, signal: controller.signal });
+      res = await fetch(path, { ...init, headers, signal: limit.signal });
     } catch (err) {
-      if (timedOut) throw new ApiError('timeout', 0);
+      if (limit.timedOut()) throw new ApiError('timeout', 0);
       if (signal?.aborted) throw err;
       throw new ApiError('network', 0);
     }
-    const body = await readJson(res);
-    if (!res.ok) {
-      const code = isObject(body) && typeof body.error === 'string' ? body.error : 'http_error';
-      throw new ApiError(code, res.status);
-    }
-    if (!isObject(body)) throw new ApiError('bad_response', res.status);
-    return body;
+    return await bodyOf(res);
   } finally {
-    clearTimeout(timer);
-    signal?.removeEventListener('abort', forward);
+    limit.dispose();
   }
 }
 

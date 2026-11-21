@@ -1,20 +1,15 @@
-import { GoogleGenAI } from '@google/genai';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
-import { createGeminiClient, type GenerateSdk } from './services/gemini.js';
+import { createGeminiClient } from './services/gemini.js';
 import { createAirService, createGeocodeService } from './services/openMeteo.js';
 
 const config = loadConfig(process.env);
 const now = () => new Date();
 
 const gemini = config.geminiApiKey
-  ? createGeminiClient(
-      config.geminiApiKey,
-      config.geminiModel,
-      new GoogleGenAI({ apiKey: config.geminiApiKey }) as unknown as GenerateSdk,
-    )
+  ? createGeminiClient(config.geminiApiKey, config.geminiModel)
   : null;
 if (!gemini) console.warn('GEMINI_API_KEY is not set: plans use the built-in rules only.');
 
