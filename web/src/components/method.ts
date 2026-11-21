@@ -53,8 +53,34 @@ const SOURCES: readonly { title: string; url: string; note: string }[] = [
   },
 ];
 
-const block = (title: string, ...body: HTMLElement[]) =>
+/** The explanations, in reading order, each under its own heading. */
+const EXPLANATIONS: readonly [title: string, text: string][] = [
+  [
+    'Where the data comes from',
+    'Air quality comes from the Copernicus Atmosphere Monitoring Service (CAMS) forecasts, served by Open-Meteo. These are modelled estimates for an area roughly 11 km across in Europe and 40 km elsewhere — not readings from a monitor on your street.',
+  ],
+  [
+    'How we work out the AQI',
+    'We compute the US EPA Air Quality Index ourselves, on its scale from 0 to 500 and above, using the EPA’s 2024 breakpoints for PM2.5. Particles (PM2.5 and PM10) use the EPA’s NowCast, as AirNow does for hourly reports: a weighted average of the last 12 hours that leans on the latest hours when the air is changing fast, read against the 24-hour breakpoints. Ozone uses the higher of its 8-hour and 1-hour figures, and nitrogen dioxide the 1-hour figure. The highest of these is the AQI, and that pollutant is shown as the main one. Because the averages look back over earlier hours, “now” is an hourly estimate rather than an official daily report. The cleanest daytime hours are the best two hours between 06:00 and 21:00, when most people are up and about; the worst two hours can fall at any time.',
+  ],
+  [
+    'Numbers from code, words from AI',
+    'Every number you see — the AQI, the best times, the percentages and the kilograms of CO₂e — is calculated by Clearday’s own tested code from the sources below, and each impact shows its formula, inputs and assumptions. Google Gemini only chooses and words the advice. If an AI sentence contains a number we didn’t calculate, we replace it with our standard text, and if Gemini is unavailable you get the same plan built from our rules.',
+  ],
+];
+
+const LIMITS: readonly string[] = [
+  'Forecasts can miss very local sources such as a busy road, a fire nearby or a neighbour’s stove.',
+  'Impacts are estimates for a typical home, body and vehicle under the stated assumptions; your own may differ.',
+  'Grid carbon intensity is a yearly national average, not the mix at the moment you charge.',
+  'Clearday is not medical advice. If you have symptoms or a health condition, follow your clinician’s guidance.',
+];
+
+const block = (title: string, ...body: HTMLElement[]): HTMLElement =>
   h('div', { class: 'method__block' }, h('h3', { class: 'method__title' }, title), ...body);
+
+const sourceItem = (s: (typeof SOURCES)[number]): HTMLElement =>
+  h('li', {}, externalLink(s.url, s.title), h('span', { class: 'method__note' }, ` — ${s.note}`));
 
 /** "How we calculate": data, method, the numbers rule, sources and limits, as static copy. */
 export function renderMethod(el: HTMLElement): void {
@@ -62,71 +88,11 @@ export function renderMethod(el: HTMLElement): void {
     h(
       'div',
       { class: 'card method' },
-      block(
-        'Where the data comes from',
-        h(
-          'p',
-          {},
-          'Air quality comes from the Copernicus Atmosphere Monitoring Service (CAMS) forecasts, served by Open-Meteo. These are modelled estimates for an area roughly 11 km across in Europe and 40 km elsewhere — not readings from a monitor on your street.',
-        ),
-      ),
-      block(
-        'How we work out the AQI',
-        h(
-          'p',
-          {},
-          'We compute the US EPA Air Quality Index ourselves, on its scale from 0 to 500 and above, using the EPA’s 2024 breakpoints for PM2.5. Particles (PM2.5 and PM10) use the EPA’s NowCast, as AirNow does for hourly reports: a weighted average of the last 12 hours that leans on the latest hours when the air is changing fast, read against the 24-hour breakpoints. Ozone uses the higher of its 8-hour and 1-hour figures, and nitrogen dioxide the 1-hour figure. The highest of these is the AQI, and that pollutant is shown as the main one. Because the averages look back over earlier hours, “now” is an hourly estimate rather than an official daily report. The cleanest daytime hours are the best two hours between 06:00 and 21:00, when most people are up and about; the worst two hours can fall at any time.',
-        ),
-      ),
-      block(
-        'Numbers from code, words from AI',
-        h(
-          'p',
-          {},
-          'Every number you see — the AQI, the best times, the percentages and the kilograms of CO₂e — is calculated by Clearday’s own tested code from the sources below, and each impact shows its formula, inputs and assumptions. Google Gemini only chooses and words the advice. If an AI sentence contains a number we didn’t calculate, we replace it with our standard text, and if Gemini is unavailable you get the same plan built from our rules.',
-        ),
-      ),
-      block(
-        'Sources',
-        h(
-          'ul',
-          { class: 'method__sources' },
-          ...SOURCES.map((s) =>
-            h(
-              'li',
-              {},
-              externalLink(s.url, s.title),
-              h('span', { class: 'method__note' }, ` — ${s.note}`),
-            ),
-          ),
-        ),
-      ),
+      ...EXPLANATIONS.map(([title, text]) => block(title, h('p', {}, text))),
+      block('Sources', h('ul', { class: 'method__sources' }, ...SOURCES.map(sourceItem))),
       block(
         'Limits',
-        h(
-          'ul',
-          { class: 'method__limits' },
-          h(
-            'li',
-            {},
-            'Forecasts can miss very local sources such as a busy road, a fire nearby or a neighbour’s stove.',
-          ),
-          h(
-            'li',
-            {},
-            'Impacts are estimates for a typical home, body and vehicle under the stated assumptions; your own may differ.',
-          ),
-          h(
-            'li',
-            {},
-            'Grid carbon intensity is a yearly national average, not the mix at the moment you charge.',
-          ),
-          h(
-            'li',
-            {},
-            'Clearday is not medical advice. If you have symptoms or a health condition, follow your clinician’s guidance.',
-          ),
-        ),
+        h('ul', { class: 'method__limits' }, ...LIMITS.map((text) => h('li', {}, text))),
       ),
     ),
   );

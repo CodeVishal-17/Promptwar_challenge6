@@ -53,7 +53,9 @@ flowchart LR
 - `server/src/app.ts` builds the Express app from injected services and reads no environment
   variables. `server/src/index.ts` wires in the real ones from `config.ts`.
 - `server/src/domain/` is pure, deterministic code: AQI, windows, the impact calculators, health
-  guidance, the action catalogue, the planner, the number guard and the profile minimiser.
+  guidance, the action catalogue, the planner, the number guard and the profile minimiser. The
+  catalogue (`catalog.ts`) gathers one file of actions per plan section from `domain/actions/`;
+  `timing.ts` decides when moving an outing to a cleaner hour is worth it.
 - `server/src/services/` holds the outside world: Open-Meteo with its cache, Gemini, and the plan
   and ask services that join the domain to the model.
 - `web/` is a small app bundled by Vite, with a hash router (`web/src/router.ts`) that shows one
@@ -61,6 +63,20 @@ flowchart LR
   `innerHTML`, and draws the chart and Puff (`components/mascot.ts`) as SVG by hand. Express
   serves the built files.
 - `shared/` holds the request and response types used by both sides.
+
+### Code quality
+
+- **Strict, type-aware linting.** `eslint.config.js` applies typescript-eslint's
+  `strictTypeChecked` and `stylisticTypeChecked` rules to all application code, plus hard limits:
+  cyclomatic complexity 10, 60 lines per function, 300 lines per file, nesting depth 3 and four
+  parameters. CI fails on any finding, and on unformatted code (`npm run format:check`).
+- **Small, single-purpose modules.** Large components are split by job: the household form into
+  field builders (`formFields.ts`), its three steps (`profileSteps.ts`) and the dialog
+  (`profileForm.ts`); the city search into the listbox (`placeList.ts`), the location button
+  (`locateButton.ts`) and the combobox wiring (`locationSearch.ts`); the forecast into its scale
+  (`chartScale.ts`), the chart and its table (`forecastTable.ts`).
+- **Strict TypeScript, no escape hatches.** No `any`, no disabled lint rules and no TODOs in the
+  source.
 
 ## Accuracy
 
@@ -158,7 +174,7 @@ deploy behind that many proxies.
 ## Efficiency
 
 - **Small bundle, no framework.** There is no frontend framework, chart library or UI kit. The
-  production JavaScript is 53 kB, about 19.7 kB gzipped, and the CSS is about 9.6 kB gzipped
+  production JavaScript is 56 kB, about 20.7 kB gzipped, and the CSS is about 9.6 kB gzipped
   (`npm run build`). The one font, Nunito, is a single 39 kB Latin woff2 served from the app
   itself. The server has six runtime dependencies.
 - **Caching with request coalescing.** Air reports are cached in memory for 15 minutes per 0.1°
@@ -223,11 +239,11 @@ Clearday targets WCAG 2.2 AA:
 ## Testing
 
 ```
-npm run test:coverage   # 659 tests in 44 files; 97.0% statements, 98.4% lines, 91.0% branches
+npm run test:coverage   # 673 tests in 44 files; 97.3% statements, 98.5% lines, 91.5% branches
 ```
 
 Vitest runs three projects (`vitest.config.ts`): `server` in Node (297 tests), `web` in jsdom
-(351 tests) and `styles` (11 tests), which reads the stylesheets to check the palette's contrast
+(362 tests) and `styles` (14 tests), which reads the stylesheets to check the palette's contrast
 and that every animation respects reduced motion. CI fails if line coverage drops below 80%.
 
 - **Domain.** The AQI, unit conversion, windows, every impact calculator against hand-checked

@@ -52,7 +52,9 @@ export default tseslint.config(
   ...scoped(tseslint.configs.stylisticTypeChecked),
   {
     files: SOURCE,
-    languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } },
+    languageOptions: {
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+    },
     rules: sizeAndShape,
   },
 );

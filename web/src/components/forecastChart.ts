@@ -1,76 +1,11 @@
-import type { AirReport, AirWindow, AqiCategory, AqiReading } from '../../../shared/types.js';
+import type { AirReport, AirWindow } from '../../../shared/types.js';
 import { h } from '../dom.js';
-import { CATEGORY_LABEL, formatLocalTime, weekday } from '../format.js';
+import { formatLocalTime, weekday } from '../format.js';
+import { MIN_SCALE_TOP, chartBars, gridLines, hourTimes, type Bar } from './chartScale.js';
+import { TABLE_ID, buildOutlook, buildTable } from './forecastTable.js';
 
-export interface Bar {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  category: AqiCategory | null;
-  /** Local wall-clock `YYYY-MM-DDTHH:MM`, derived from neighbours when the reading is missing. */
-  time: string;
-}
-
-/** The y scale always reaches at least this AQI, so a clean day does not look dramatic. */
-const MIN_SCALE_TOP = 200;
-/** Share of each hour's slot the bar fills; the rest is the gap between bars. */
-const BAR_FILL = 0.76;
-const HOUR_MS = 3_600_000;
-
-/** Reads `YYYY-MM-DDTHH:MM` as a wall-clock moment on a zoneless (UTC) axis. */
-function wallMs(time: string): number {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(time);
-  return m
-    ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]))
-    : Number.NaN;
-}
-
-const wallString = (ms: number): string => new Date(ms).toISOString().slice(0, 16);
-
-/** One time per hour: the reading's own, else counted from the nearest reading that has one. */
-function hourTimes(hourly: (AqiReading | null)[]): string[] {
-  const anchors = hourly.flatMap((r, i) => (r && !Number.isNaN(wallMs(r.time)) ? [i] : []));
-  return hourly.map((r, i) => {
-    if (r) return r.time;
-    let nearest = -1;
-    for (const a of anchors)
-      if (nearest < 0 || Math.abs(a - i) < Math.abs(nearest - i)) nearest = a;
-    if (nearest < 0) return '';
-    const anchor = hourly[nearest] as AqiReading;
-    return wallString(wallMs(anchor.time) + (i - nearest) * HOUR_MS);
-  });
-}
-
-/**
- * One bar per hour in a `width` × `height` box, equal widths, bottoms on the baseline (y + h =
- * height). The scale tops out at `maxAqi`, by default the larger of 200 and the highest AQI.
- * A missing reading is a zero-height bar with no category.
- */
-export function chartBars(
-  hourly: (AqiReading | null)[],
-  width: number,
-  height: number,
-  maxAqi?: number,
-): Bar[] {
-  if (hourly.length === 0) return [];
-  const highest = Math.max(0, ...hourly.map((r) => r?.aqi ?? 0));
-  const top = maxAqi ?? Math.max(MIN_SCALE_TOP, highest);
-  const slot = width / hourly.length;
-  const w = slot * BAR_FILL;
-  const times = hourTimes(hourly);
-  return hourly.map((r, i) => {
-    const barH = r ? Math.min(height, (r.aqi / top) * height) : 0;
-    return {
-      x: i * slot + (slot - w) / 2,
-      y: height - barH,
-      w,
-      h: barH,
-      category: r ? r.category : null,
-      time: times[i] ?? '',
-    };
-  });
-}
+export { chartBars, gridLines } from './chartScale.js';
+export type { Bar } from './chartScale.js';
 
 // ---------- SVG plumbing ----------
 
@@ -98,10 +33,6 @@ function svg<K extends keyof SVGElementTagNameMap>(
 // carries no text: every label is HTML, positioned by percentage, and stays at a readable size.
 const PLOT_W = 480;
 const PLOT_H = 100;
-/** Grid lines sit on the EPA category boundaries, plus 1000 because the AQI runs on past 500. */
-const GRID_LINES = [50, 100, 150, 200, 300, 500, 1000];
-/** Nearest two grid lines may sit, as a share of the scale, so their labels never overlap. */
-const MIN_GRID_GAP = 0.12;
 /** Scale tops from which an axis label has four digits and needs a wider label column. */
 const WIDE_AXIS_FROM = 1000;
 const GAP_MARK_H = 2.5;
@@ -193,14 +124,56 @@ function windowMarks(report: AirReport, times: string[], slot: number): Placed {
   return out;
 }
 
-/** The grid lines for a scale that tops out at `top`: the boundaries that fit, spaced to be labelled. */
-export function gridLines(top: number): number[] {
-  const lines: number[] = [];
-  for (const v of GRID_LINES) {
-    if (v > top) break;
-    if ((v - (lines.at(-1) ?? 0)) / top >= MIN_GRID_GAP) lines.push(v);
-  }
-  return lines;
+/** Horizontal grid lines at the AQI boundaries, and their HTML labels up the side. */
+function yAxis(top: number): { lines: SVGElement[]; labels: HTMLElement[] } {
+  const values = gridLines(top);
+  const lines = values.map((v) => {
+    const y = PLOT_H - (v / top) * PLOT_H;
+    return svg('line', { class: 'chart__grid', x1: 0, x2: PLOT_W, y1: y, y2: y });
+  });
+  const labels = values.map((v) => {
+    const el = h('span', { class: 'chart__axis-label' }, String(v));
+    el.style.bottom = `${String(Math.round((v / top) * 10000) / 100)}%`;
+    return el;
+  });
+  return { lines, labels };
+}
+
+/** A coloured bar per reading; a missing hour is a short grey mark on the baseline. */
+const barRect = (b: Bar): SVGElement =>
+  b.category
+    ? svg('rect', {
+        class: 'chart__bar',
+        'data-category': b.category,
+        x: b.x,
+        y: b.y,
+        width: b.w,
+        height: b.h,
+      })
+    : svg('rect', {
+        class: 'chart__gap',
+        'data-category': 'none',
+        x: b.x,
+        y: PLOT_H - GAP_MARK_H,
+        width: b.w,
+        height: GAP_MARK_H,
+      });
+
+/** A time label every TICK_EVERY_H hours (with the weekday at midnight) and a faint line above it. */
+function xAxis(times: string[], slot: number): { lines: SVGElement[]; ticks: HTMLElement[] } {
+  const lines: SVGElement[] = [];
+  const ticks: HTMLElement[] = [];
+  times.forEach((t, i) => {
+    if (!t || hourOf(t) % TICK_EVERY_H !== 0) return;
+    const centre = i * slot + slot / 2;
+    lines.push(svg('line', { class: 'chart__vgrid', x1: centre, x2: centre, y1: 0, y2: PLOT_H }));
+    const hour = hourOf(t);
+    const day =
+      hour === 0 ? [h('span', { class: 'chart__tick-day' }, weekday(t.slice(0, 10), 'short'))] : [];
+    const minor = hour % 12 === 0 ? '' : ' chart__tick-label--minor';
+    ticks.push(placed(`chart__tick-label${minor}`, (centre * 100) / PLOT_W, hhmm(t), ...day));
+  });
+  return { lines, ticks };
 }
 
 function buildChart(report: AirReport): HTMLElement {
@@ -208,59 +181,10 @@ function buildChart(report: AirReport): HTMLElement {
   const times = hourTimes(hourly);
   const highest = Math.max(0, ...hourly.map((r) => r?.aqi ?? 0));
   const top = Math.max(MIN_SCALE_TOP, highest);
-  const bars = chartBars(hourly, PLOT_W, PLOT_H, top);
   const slot = PLOT_W / hourly.length;
-
-  const gridValues = gridLines(top);
-  const grid = gridValues.map((v) => {
-    const y = PLOT_H - (v / top) * PLOT_H;
-    return svg('line', { class: 'chart__grid', x1: 0, x2: PLOT_W, y1: y, y2: y });
-  });
-  const yLabels = gridValues.map((v) => {
-    const el = h('span', { class: 'chart__axis-label' }, String(v));
-    el.style.bottom = `${Math.round((v / top) * 10000) / 100}%`;
-    return el;
-  });
-
-  const barEls = bars.map((b) =>
-    b.category
-      ? svg('rect', {
-          class: 'chart__bar',
-          'data-category': b.category,
-          x: b.x,
-          y: b.y,
-          width: b.w,
-          height: b.h,
-        })
-      : svg('rect', {
-          class: 'chart__gap',
-          'data-category': 'none',
-          x: b.x,
-          y: PLOT_H - GAP_MARK_H,
-          width: b.w,
-          height: GAP_MARK_H,
-        }),
-  );
-
-  const verticals: SVGElement[] = [];
-  const ticks: HTMLElement[] = [];
-  times.forEach((t, i) => {
-    if (!t || hourOf(t) % TICK_EVERY_H !== 0) return;
-    const centre = i * slot + slot / 2;
-    verticals.push(
-      svg('line', { class: 'chart__vgrid', x1: centre, x2: centre, y1: 0, y2: PLOT_H }),
-    );
-    const hour = hourOf(t);
-    const day =
-      hour === 0 ? h('span', { class: 'chart__tick-day' }, weekday(t.slice(0, 10), 'short')) : null;
-    const tick = placed(
-      `chart__tick-label${hour % 12 === 0 ? '' : ' chart__tick-label--minor'}`,
-      (centre * 100) / PLOT_W,
-      hhmm(t),
-      ...(day ? [day] : []),
-    );
-    ticks.push(tick);
-  });
+  const barEls = chartBars(hourly, PLOT_W, PLOT_H, top).map(barRect);
+  const { lines: grid, labels: yLabels } = yAxis(top);
+  const { lines: verticals, ticks } = xAxis(times, slot);
 
   const stack = windowMarks(report, times, slot);
   const plot = svg(
@@ -314,80 +238,6 @@ function windowSummary(windows: AirWindow[]): HTMLElement | null {
     ];
   });
   return items.length > 0 ? h('ul', { class: 'forecast__windows' }, ...items) : null;
-}
-
-function swatch(category: AqiCategory | null): HTMLElement {
-  return h('span', {
-    class: 'aqi-swatch',
-    'data-category': category ?? 'none',
-    'aria-hidden': 'true',
-  });
-}
-
-const TABLE_ID = 'forecast-table-panel';
-
-function buildTable(report: AirReport): HTMLElement {
-  const times = hourTimes(report.hourly);
-  const rows = report.hourly.map((r, i) => {
-    const t = times[i];
-    const when = t ? `${weekday(t.slice(0, 10), 'short')} ${hhmm(t)}` : '—';
-    return h(
-      'tr',
-      {},
-      h('th', { scope: 'row' }, when),
-      h('td', { class: 'num' }, r ? String(r.aqi) : '—'),
-      r
-        ? h('td', {}, swatch(r.category), CATEGORY_LABEL[r.category])
-        : h('td', { class: 'forecast__muted' }, 'No data'),
-    );
-  });
-  return h(
-    'div',
-    {
-      id: TABLE_ID,
-      class: 'forecast__table-wrap',
-      hidden: true,
-      role: 'region',
-      'aria-label': 'Hourly AQI table',
-      tabindex: '0',
-    },
-    h(
-      'table',
-      { class: 'data-table' },
-      h('caption', {}, `Hourly US AQI for the next ${report.hourly.length} hours`),
-      h(
-        'thead',
-        {},
-        h(
-          'tr',
-          {},
-          h('th', { scope: 'col' }, 'Time'),
-          h('th', { scope: 'col', class: 'num' }, 'AQI'),
-          h('th', { scope: 'col' }, 'Category'),
-        ),
-      ),
-      h('tbody', {}, ...rows),
-    ),
-  );
-}
-
-function buildOutlook(report: AirReport): HTMLElement | null {
-  if (report.outlook.length === 0) return null;
-  const items = report.outlook.map((d) =>
-    h(
-      'li',
-      { class: 'outlook__day' },
-      h('span', { class: 'outlook__name' }, weekday(d.date, 'long')),
-      h('span', { class: 'outlook__category' }, swatch(d.category), CATEGORY_LABEL[d.category]),
-      h('span', { class: 'outlook__aqi' }, `Peak AQI ${d.maxAqi}`),
-    ),
-  );
-  return h(
-    'div',
-    { class: 'outlook-block' },
-    h('h3', { class: 'forecast__subtitle' }, 'Coming days'),
-    h('ul', { class: 'outlook' }, ...items),
-  );
 }
 
 /** Renders the 48-hour chart, its table alternative and the multi-day outlook into `el`. */

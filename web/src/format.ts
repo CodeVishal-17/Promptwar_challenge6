@@ -70,3 +70,6 @@ export function dayOffset(from: string, to: string): number {
   const day = (iso: string) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
   return Math.round((day(to) - day(from)) / 86_400_000);
 }
+
+/** Two decimals (≈1 km): enough for city air, and no more precise than people expect to share. */
+export const roundCoord = (n: number): number => Math.round(n * 100) / 100;

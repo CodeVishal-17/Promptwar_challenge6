@@ -1,7 +1,7 @@
 import type { Place } from '../../../shared/types.js';
 import { ApiError, searchPlaces } from '../api.js';
 import { announce, h } from '../dom.js';
-import { formatPlace } from '../format.js';
+import { formatPlace, roundCoord } from '../format.js';
 import { icon } from '../icons.js';
 import { type Coords, browserGeolocate, locateButton } from './locateButton.js';
 import { PlaceList } from './placeList.js';
@@ -25,16 +25,14 @@ function searchErrorMessage(err: unknown): string {
   return "Place search isn't available right now — please try again.";
 }
 
-const round2 = (n: number): number => Math.round(n * 100) / 100;
-
 /** A place for the browser's own position. A reverse lookup would be another request, so the
  * country is unknown and grid figures use the world average (an empty code counts as absent). */
 const currentLocation = ({ lat, lon }: Coords): Place => ({
   name: 'Current location',
   country: '',
   countryCode: '',
-  lat: round2(lat),
-  lon: round2(lon),
+  lat: roundCoord(lat),
+  lon: roundCoord(lon),
 });
 
 /** The input, its listbox popup and the message line, wired with ARIA ids under `id`. */

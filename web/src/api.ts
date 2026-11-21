@@ -1,4 +1,5 @@
 import type { AirReport, AskRequest, Place, Plan, PlanRequest } from '../../shared/types.js';
+import { roundCoord } from './format.js';
 
 const TIMEOUT_MS = 15_000;
 
@@ -16,9 +17,6 @@ export class ApiError extends Error {
     this.name = 'ApiError';
   }
 }
-
-/** Two decimals (≈1 km): enough for city air, and no more precise than people expect to share. */
-const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -108,7 +106,7 @@ export async function searchPlaces(q: string, signal?: AbortSignal): Promise<Pla
 }
 
 export async function getAir(lat: number, lon: number): Promise<AirReport> {
-  const query = new URLSearchParams({ lat: String(round2(lat)), lon: String(round2(lon)) });
+  const query = new URLSearchParams({ lat: String(roundCoord(lat)), lon: String(roundCoord(lon)) });
   const body = (await request(`/api/air?${query}`)) as Partial<AirReport>;
   if (!Array.isArray(body.hourly) || !isObject(body.source))
     throw new ApiError('bad_response', 200);
@@ -118,16 +116,16 @@ export async function getAir(lat: number, lon: number): Promise<AirReport> {
 export async function getPlan(body: PlanRequest): Promise<Plan> {
   return (await postJson('/api/plan', {
     ...body,
-    lat: round2(body.lat),
-    lon: round2(body.lon),
+    lat: roundCoord(body.lat),
+    lon: roundCoord(body.lon),
   })) as Plan;
 }
 
 export async function ask(body: AskRequest): Promise<{ answer: string; aiUsed: boolean }> {
   const out = (await postJson('/api/ask', {
     ...body,
-    lat: round2(body.lat),
-    lon: round2(body.lon),
+    lat: roundCoord(body.lat),
+    lon: roundCoord(body.lon),
   })) as { answer?: unknown; aiUsed?: unknown };
   if (typeof out.answer !== 'string') throw new ApiError('bad_response', 200);
   return { answer: out.answer, aiUsed: out.aiUsed === true };
