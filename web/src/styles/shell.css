@@ -773,3 +773,39 @@ body {
   border-radius: var(--radius-pill);
   background: var(--tile-sky);
 }
+
+/* ---------- Sky tint ---------- */
+
+/*
+ * The top of the sky follows the air: clear blue on good days, hazy to deep peach as it worsens.
+ * Body text (#1b2a33) stays at least 7.9:1 on every stop; anything else on the sky uses .on-sky.
+ */
+body[data-sky='moderate'] {
+  --sky-top: #a8dfff;
+  --sky-mid: #cdeeff;
+}
+
+body[data-sky='usg'] {
+  --sky-top: #c4e8fb;
+  --sky-mid: #e6f4fa;
+}
+
+body[data-sky='unhealthy'] {
+  --sky-top: #ffd9b8;
+  --sky-mid: #ffeedd;
+}
+
+body[data-sky='very_unhealthy'] {
+  --sky-top: #f5c3a8;
+  --sky-mid: #fbe3d3;
+}
+
+body[data-sky='hazardous'] {
+  --sky-top: #eeb092;
+  --sky-mid: #f8dccb;
+}
+
+body[data-sky='none'] {
+  --sky-top: #c9dce8;
+  --sky-mid: #e3edf3;
+}

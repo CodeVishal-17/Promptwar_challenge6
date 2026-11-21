@@ -612,3 +612,25 @@ describe('routine checklist', () => {
     ).toBe(false);
   });
 });
+
+describe('sky tint', () => {
+  afterEach(() => delete document.body.dataset.sky);
+
+  it('tints the sky to the air’s category once it loads', async () => {
+    savePlace(PLACE);
+    await boot(deps());
+    expect(document.body.dataset.sky).toBe('unhealthy');
+  });
+
+  it('drops the tint while another place loads, and has none before a place', async () => {
+    await boot(deps());
+    expect(document.body.dataset.sky).toBeUndefined();
+    savePlace(PLACE);
+    await boot(deps());
+    getAir.mockImplementationOnce(() => new Promise(() => {}));
+    searchPlaces.mockResolvedValueOnce([{ ...PLACE, name: 'Lima', countryCode: 'PE' }]);
+    await pickFromSearch();
+    await flush();
+    expect(document.body.dataset.sky).toBeUndefined();
+  });
+});

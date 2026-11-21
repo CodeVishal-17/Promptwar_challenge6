@@ -218,4 +218,40 @@
       transform: translateY(-4px);
     }
   }
+
+  /* Forecast bars grow up from the baseline. */
+  .chart__bar {
+    transform-box: fill-box;
+    transform-origin: bottom;
+    animation: bar-grow 500ms var(--ease) backwards;
+  }
+
+  @keyframes bar-grow {
+    from {
+      transform: scaleY(0);
+    }
+  }
+
+  /* Today's cards arrive one after another. */
+  .highlights > li:nth-child(2) .highlight {
+    animation-delay: 60ms;
+  }
+
+  .highlights > li:nth-child(3) .highlight {
+    animation-delay: 120ms;
+  }
+
+  /* Buttons and links give a little squish when pressed. */
+  .btn:active,
+  .highlight:active,
+  .tabbar__link:active,
+  .place-pill:active {
+    animation: squish 160ms var(--ease);
+  }
+
+  @keyframes squish {
+    50% {
+      transform: scale(0.95);
+    }
+  }
 }

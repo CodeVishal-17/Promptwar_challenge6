@@ -275,6 +275,7 @@ let generation = 0;
 function resetDependents(): void {
   loaded = null;
   todayReport = null;
+  delete document.body.dataset.sky;
   planGeneration++;
   byId('highlights').hidden = true;
   byId('highlights').replaceChildren();
@@ -337,6 +338,8 @@ async function showPlace(place: Place): Promise<void> {
     return;
   }
   todayReport = report;
+  // The sky behind Today takes on the air's mood (decoration; the text says what it means).
+  document.body.dataset.sky = moodFor(report);
   setStage('ready');
   announce(
     report.now
@@ -359,6 +362,7 @@ export async function boot(deps: BootDeps = {}): Promise<void> {
   planCache.clear();
   currentPlace = null;
   todayReport = null;
+  delete document.body.dataset.sky;
   router?.stop();
   router = startRouter({ placeName: () => currentPlace?.name ?? null });
   showPuff('wave', WELCOME_LINE);
