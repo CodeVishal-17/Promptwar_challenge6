@@ -9,6 +9,13 @@ number (kg CO₂e a year, % change in PM2.5 inhaled, % less PM2.5 indoors) that 
 inputs, assumptions and sources. Google Gemini picks and words the advice. Every number comes from
 tested TypeScript, never from the model. You can also ask follow-up questions about today's air.
 
+It feels like an app, not a long page. Five screens (Today, Forecast, My plan, Ask and How it
+works) each have their own address, so Back, refresh and shared links work. A floating tab bar on
+phones becomes a row of pills on wider screens. Puff, a cloud mascot, greets you and reacts to the
+air honestly. He grins on a good day, wears a mask once the air is unhealthy, and stays indoors
+when it is worse. What he says comes from a fixed table in the code, never from the AI. Families
+can tick off the day's routine steps, and Puff cheers when they are all done.
+
 ## How it meets the brief
 
 > Create a GenAI-powered assistant that helps families and communities navigate severe winter
@@ -49,8 +56,10 @@ flowchart LR
   guidance, the action catalogue, the planner, the number guard and the profile minimiser.
 - `server/src/services/` holds the outside world: Open-Meteo with its cache, Gemini, and the plan
   and ask services that join the domain to the model.
-- `web/` is a single page bundled by Vite. It builds all DOM through `h()` in `web/src/dom.ts`,
-  never through `innerHTML`, and draws the chart as SVG by hand. Express serves the built files.
+- `web/` is a small app bundled by Vite, with a hash router (`web/src/router.ts`) that shows one
+  screen at a time. It builds all DOM through `h()` in `web/src/dom.ts`, never through
+  `innerHTML`, and draws the chart and Puff (`components/mascot.ts`) as SVG by hand. Express
+  serves the built files.
 - `shared/` holds the request and response types used by both sides.
 
 ## Accuracy
@@ -149,8 +158,9 @@ deploy behind that many proxies.
 ## Efficiency
 
 - **Small bundle, no framework.** There is no frontend framework, chart library or UI kit. The
-  production JavaScript is 42 kB, about 16.0 kB gzipped, and the CSS is about 6.9 kB gzipped
-  (`npm run build`). The server has six runtime dependencies.
+  production JavaScript is 53 kB, about 19.7 kB gzipped, and the CSS is about 9.6 kB gzipped
+  (`npm run build`). The one font, Nunito, is a single 39 kB Latin woff2 served from the app
+  itself. The server has six runtime dependencies.
 - **Caching with request coalescing.** Air reports are cached in memory for 15 minutes per 0.1°
   grid cell and place searches for 24 hours. Concurrent requests for the same key share one
   upstream fetch, and the cache is bounded at 500 entries (`server/src/services/cache.ts`).
@@ -163,7 +173,9 @@ deploy behind that many proxies.
 
 Clearday targets WCAG 2.2 AA:
 
-- **Page structure.** A skip link, landmarks, one `h1` and labelled sections.
+- **Page structure.** A skip link, landmarks, a main navigation of plain links that marks the
+  current screen with `aria-current="page"`, one `h1` per screen and labelled sections. Moving
+  to another screen moves focus to its heading and updates the page title.
 - **City search.** It follows the ARIA 1.2 combobox pattern (`locationSearch.ts`).
 - **Household form.** A modal dialog that moves focus to each step's heading, closes on Escape
   and returns focus to where it came from (`profileForm.ts`).
@@ -175,23 +187,33 @@ Clearday targets WCAG 2.2 AA:
   Moderate bars stay visible (WCAG 1.4.11).
 - **Visible focus and touch targets.** Focus rings are a visible 3 px. Buttons, impact chips and
   form fields are at least 40 px tall, well above the 24 px WCAG 2.2 minimum.
-- **One bright theme, checked for contrast.** A deep-teal header and hero sit over a warm cream
-  page with white cards. Inside the band the text tokens switch to white, pale teal and sunny
-  yellow, so labels, messages and focus rings there keep at least 5.8:1. Sunny yellow is used for
-  fills and highlights, never as text on a light surface.
-- **Display preferences.** Motion is dropped when the system asks for reduced motion, and the
-  layout works from 320 px wide.
+- **One bright theme, checked for contrast.** A sky gradient fades into warm cream under white
+  cards. On the sky, all text uses the dark body colour (at least 7.9:1 on every sky tint;
+  `tests/styles/tokens.test.ts` checks each one). Teal links, white text on teal and sunny
+  buttons with dark text all reach AA. The six EPA colours are never used as text.
+- **Display preferences.** Every decorative animation (screen changes, Puff's float and blink,
+  cards popping in, the confetti) sits in one `prefers-reduced-motion: no-preference` block in
+  `web/src/styles/motion.css`, and a test keeps it that way. Nothing flashes. The layout works
+  from 320 px wide.
+- **Puff is decoration.** His SVG is `aria-hidden`; what he says is real text, and emoji beside
+  it are hidden from screen readers. The plan's Done boxes are labelled "Done: <step>", and
+  finishing the routine is announced once.
 - **Location errors say how to fix them.** If "Use my location" fails, the message says whether
   access is blocked (with a pointer to site settings), the position is unavailable, or the request
   timed out.
 - **Automated checks.** `tests/web/a11y.test.ts` renders the real page with fixture data in jsdom
   and runs axe-core with the `wcag2a`, `wcag2aa`, `wcag21aa` and `wcag22aa` tags. It covers the
-  empty page, the full report with the table open, an open impact panel, every step of the
-  household dialog, the first-visit dialog and an answered question, and expects zero
-  violations. Colour contrast and target size need a real layout engine, so those two rules are
-  run in a real browser instead.
+  five screens before a place is chosen and again with one loaded, the reopened search, the
+  full report with the table open, an open impact panel, every step of the household dialog,
+  the first-visit dialog and an answered question, and expects zero violations. Colour contrast
+  and target size need a real layout engine, so those two rules are run in a real browser
+  instead.
 
-  An earlier browser pass (Chromium, at 320 px, 375 px and desktop width, with the dialog, the
+  After the redesign, axe-core ran in Chromium on all five screens, with and without a place,
+  at 320 px, 375 px and desktop width, with every rule on (contrast and target size included).
+  It found zero violations.
+
+  Before the redesign, a browser pass (Chromium, at 320 px, 375 px and desktop width, with the dialog, the
   table and every impact panel open) found zero violations, including contrast. Where axe could
   not judge contrast on its own (text over the AQI card's colour stripe, or rows scrolled out of
   the table's view), the ratio was measured directly. After the switch to the bright theme, every
@@ -201,11 +223,12 @@ Clearday targets WCAG 2.2 AA:
 ## Testing
 
 ```
-npm run test:coverage   # 486 tests in 37 files; 96.5% statements, 98.2% lines, 90.0% branches
+npm run test:coverage   # 659 tests in 44 files; 97.0% statements, 98.4% lines, 91.0% branches
 ```
 
-Vitest runs two projects (`vitest.config.ts`): `server` in Node (285 tests) and `web` in jsdom
-(201 tests). CI fails if line coverage drops below 80%.
+Vitest runs three projects (`vitest.config.ts`): `server` in Node (297 tests), `web` in jsdom
+(351 tests) and `styles` (11 tests), which reads the stylesheets to check the palette's contrast
+and that every animation respects reduced motion. CI fails if line coverage drops below 80%.
 
 - **Domain.** The AQI, unit conversion, windows, every impact calculator against hand-checked
   values, health guidance, catalogue filtering, the planner, the number guard and the profile
@@ -215,7 +238,9 @@ Vitest runs two projects (`vitest.config.ts`): `server` in Node (285 tests) and 
 - **API (Supertest).** Each route's happy path, validation, the 10 kb limit, rate limits, proxy
   trust, error mapping, the exact CSP, caching headers, and that questions are never logged
   (`tests/server/app.test.ts`).
-- **Web.** Every component and the app's boot, place-change and error flows, plus the axe checks
+- **Web.** Every component, the router (deep links, Back, focus and titles), Puff's mood and words
+  per category, Today's cards, the routine checklist (kept per place and day, reset the next
+  day, celebrated once), the app's boot, place-change and error flows, plus the axe checks
   (`tests/web/`).
 - **No network.** `fetch` and Gemini are injected fakes. The Open-Meteo fixture is generated
   offline by `tests/fixtures/generateOpenMeteoAir.mjs`.
@@ -291,4 +316,5 @@ All settings are environment variables, read only in `server/src/config.ts`. See
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). The Nunito font (`web/src/assets/fonts/`) is © The Nunito Project Authors,
+under the [SIL Open Font License 1.1](web/src/assets/fonts/OFL.txt).
