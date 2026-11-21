@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { Plan } from '../../../shared/types.js';
 import { ALL_DONE, renderPlan, type Checklist } from '../../../web/src/components/planView.js';
 import { makeItem, makePlan, resetDom } from '../helpers.js';
@@ -20,8 +20,10 @@ beforeEach(() => {
 const announcements = (): number => observer.takeRecords().length;
 const status = (): string => document.getElementById('status')?.textContent ?? '';
 
-function checklist(done: string[] = []): Checklist & { onChange: ReturnType<typeof vi.fn> } {
-  return { done: new Set(done), onChange: vi.fn() };
+type OnChange = (done: ReadonlySet<string>) => void;
+
+function checklist(done: string[] = []): Checklist & { onChange: Mock<OnChange> } {
+  return { done: new Set(done), onChange: vi.fn<OnChange>() };
 }
 
 const boxes = (): HTMLInputElement[] => [...el.querySelectorAll<HTMLInputElement>('.done__box')];
