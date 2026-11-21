@@ -10,6 +10,7 @@ const KEYS = {
   profile: 'clearday.profile.v1',
   place: 'clearday.place.v1',
   onboarded: 'clearday.onboarded.v1',
+  done: 'clearday.done.v1',
 } as const;
 
 function storage(): Storage | null {
@@ -171,4 +172,35 @@ export function hasSeenOnboarding(): boolean {
 
 export function markOnboardingSeen(): void {
   write(KEYS.onboarded, true);
+}
+
+// ---------- Today's routine ticks ----------
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** `lat,lon|YYYY-MM-DD` in the browser's local date: ticks belong to one place and one day. */
+export function doneKey(place: Place, now = new Date()): string {
+  const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return `${place.lat},${place.lon}|${date}`;
+}
+
+/** The routine steps ticked under `key`; empty for another day or place, or bad data. */
+export function loadDone(key: string): Set<string> {
+  return parseOr(
+    read(KEYS.done),
+    (value) => {
+      const entry = obj(value);
+      if (entry.key !== key) return new Set<string>();
+      if (!Array.isArray(entry.ids) || !entry.ids.every((id) => typeof id === 'string')) {
+        throw new Invalid();
+      }
+      return new Set(entry.ids as string[]);
+    },
+    () => new Set<string>(),
+  );
+}
+
+/** Stores today's ticks, replacing any earlier day's or place's, so storage never grows. */
+export function saveDone(key: string, ids: ReadonlySet<string>): void {
+  write(KEYS.done, { key, ids: [...ids] });
 }

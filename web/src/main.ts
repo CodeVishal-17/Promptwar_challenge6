@@ -22,10 +22,13 @@ import { announce } from './dom.js';
 import { startRouter, type Router } from './router.js';
 import { CATEGORY_LABEL, formatPlace } from './format.js';
 import {
+  doneKey,
   hasSeenOnboarding,
+  loadDone,
   loadPlace,
   loadProfile,
   markOnboardingSeen,
+  saveDone,
   savePlace,
   saveProfile,
 } from './store.js';
@@ -213,8 +216,14 @@ export async function requestPlan(
     if (mine !== planGeneration) return;
   }
 
+  // Today's ticks are kept per place and local day, so a re-plan in a new hour keeps them.
+  const ticks = doneKey(place);
+  const checklist = {
+    done: loadDone(ticks),
+    onChange: (done: ReadonlySet<string>) => saveDone(ticks, done),
+  };
   try {
-    renderPlan(body, plan, { hasReading });
+    renderPlan(body, plan, { hasReading, checklist });
   } catch (err) {
     fail(err);
     return;

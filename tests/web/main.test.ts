@@ -569,3 +569,46 @@ describe('app shell', () => {
     expect(document.activeElement?.id).toBe('ask-title');
   });
 });
+
+describe('routine checklist', () => {
+  afterEach(() => vi.useRealTimers());
+
+  const tickFirst = (): HTMLInputElement => {
+    const box = document.querySelector<HTMLInputElement>('#plan-body .done__box');
+    if (!box) throw new Error('No Done box');
+    box.checked = true;
+    box.dispatchEvent(new Event('change'));
+    return box;
+  };
+
+  it('keeps today’s ticks when the plan is made again for a new household', async () => {
+    savePlace(PLACE);
+    await boot(deps());
+    const id = tickFirst().id;
+    byText(document, 'Edit household')?.click();
+    const dialog = document.querySelector('dialog') as HTMLDialogElement;
+    (dialog.querySelector('input[type="number"]') as HTMLInputElement).value = '3';
+    byText(dialog, 'Next')?.click();
+    byText(dialog, 'Next')?.click();
+    byText(dialog, 'Save')?.click();
+    await flush();
+    expect(getPlan).toHaveBeenCalledTimes(2);
+    expect(document.querySelector<HTMLInputElement>(`#${id}`)?.checked).toBe(true);
+    expect(document.querySelector('.routine-progress')?.textContent).toBe('1 of 3 done');
+  });
+
+  it('starts the next day with nothing ticked', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 21, 9));
+    savePlace(PLACE);
+    await boot(deps());
+    tickFirst();
+
+    vi.setSystemTime(new Date(2026, 10, 22, 9));
+    loadShell();
+    await boot(deps());
+    expect(
+      [...document.querySelectorAll<HTMLInputElement>('.done__box')].some((b) => b.checked),
+    ).toBe(false);
+  });
+});

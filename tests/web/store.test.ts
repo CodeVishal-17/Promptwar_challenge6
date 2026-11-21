@@ -2,10 +2,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_PROFILE } from '../../shared/profile.js';
 import type { Profile } from '../../shared/types.js';
 import {
+  doneKey,
   hasSeenOnboarding,
+  loadDone,
   loadPlace,
   loadProfile,
   markOnboardingSeen,
+  saveDone,
   savePlace,
   saveProfile,
 } from '../../web/src/store.js';
@@ -141,5 +144,50 @@ describe('onboarding flag', () => {
     breakStorage();
     expect(hasSeenOnboarding()).toBe(false);
     expect(() => markOnboardingSeen()).not.toThrow();
+  });
+});
+
+describe('routine ticks', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('keys ticks by place and the browser’s local date', () => {
+    expect(doneKey(PLACE, new Date(2026, 10, 21, 23, 30))).toBe('-23.5475,-46.63611|2026-11-21');
+    expect(doneKey(PLACE, new Date(2026, 0, 5, 0, 5))).toBe('-23.5475,-46.63611|2026-01-05');
+  });
+
+  it('loads what was saved under the same key', () => {
+    const key = doneKey(PLACE, new Date(2026, 10, 21, 9));
+    saveDone(key, new Set(['exercise-indoors', 'avoid-worst-window']));
+    expect([...loadDone(key)].sort()).toEqual(['avoid-worst-window', 'exercise-indoors']);
+  });
+
+  it('starts empty on the next day or at another place', () => {
+    saveDone(doneKey(PLACE, new Date(2026, 10, 21, 9)), new Set(['exercise-indoors']));
+    expect(loadDone(doneKey(PLACE, new Date(2026, 10, 22, 9))).size).toBe(0);
+    expect(loadDone(doneKey({ ...PLACE, lat: 10 }, new Date(2026, 10, 21, 9))).size).toBe(0);
+  });
+
+  it.each(['{', '{"key":1}', '{"key":"k","ids":[1]}', '{"key":"k","ids":"a"}', 'null'])(
+    'treats a corrupt stored value as no ticks: %s',
+    (raw) => {
+      localStorage.setItem('clearday.done.v1', raw);
+      expect(loadDone('k').size).toBe(0);
+    },
+  );
+
+  it('keeps one entry only, so storage never grows', () => {
+    saveDone('a|2026-11-21', new Set(['x']));
+    saveDone('b|2026-11-21', new Set(['y']));
+    expect(loadDone('a|2026-11-21').size).toBe(0);
+    expect(JSON.parse(localStorage.getItem('clearday.done.v1') ?? '')).toEqual({
+      key: 'b|2026-11-21',
+      ids: ['y'],
+    });
+  });
+
+  it('never throws when storage is blocked', () => {
+    breakStorage();
+    expect(loadDone('k').size).toBe(0);
+    expect(() => saveDone('k', new Set(['x']))).not.toThrow();
   });
 });

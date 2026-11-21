@@ -85,4 +85,118 @@
       transform: translateY(8px);
     }
   }
+
+  /* The plan celebration: Puff hops and a little confetti falls once. */
+  .celebration .puff {
+    animation: puff-cheer 600ms var(--ease) 2;
+  }
+
+  @keyframes puff-cheer {
+    40% {
+      transform: translateY(-8px) rotate(-4deg);
+    }
+  }
+
+  .confetti {
+    position: absolute;
+    inset: -1rem 0 auto;
+    display: block;
+    height: 0;
+    pointer-events: none;
+  }
+
+  .confetti__piece {
+    position: absolute;
+    top: 0;
+    width: 8px;
+    height: 12px;
+    border-radius: 2px;
+    opacity: 0;
+    animation: confetti-fall 1.2s var(--ease) 1 forwards;
+  }
+
+  .confetti__piece:nth-child(6n + 1) {
+    background: var(--color-sun);
+  }
+
+  .confetti__piece:nth-child(6n + 2) {
+    background: #7cc9f2;
+  }
+
+  .confetti__piece:nth-child(6n + 3) {
+    background: #6fd99a;
+  }
+
+  .confetti__piece:nth-child(6n + 4) {
+    background: #ffb08a;
+  }
+
+  .confetti__piece:nth-child(6n + 5) {
+    background: #b8a6f5;
+  }
+
+  .confetti__piece:nth-child(6n) {
+    background: var(--color-accent);
+  }
+
+  .confetti__piece:nth-child(1) {
+    left: 4%;
+    animation-delay: 0ms;
+  }
+  .confetti__piece:nth-child(2) {
+    left: 12%;
+    animation-delay: 80ms;
+  }
+  .confetti__piece:nth-child(3) {
+    left: 21%;
+    animation-delay: 40ms;
+  }
+  .confetti__piece:nth-child(4) {
+    left: 30%;
+    animation-delay: 120ms;
+  }
+  .confetti__piece:nth-child(5) {
+    left: 39%;
+    animation-delay: 20ms;
+  }
+  .confetti__piece:nth-child(6) {
+    left: 48%;
+    animation-delay: 100ms;
+  }
+  .confetti__piece:nth-child(7) {
+    left: 57%;
+    animation-delay: 60ms;
+  }
+  .confetti__piece:nth-child(8) {
+    left: 66%;
+    animation-delay: 140ms;
+  }
+  .confetti__piece:nth-child(9) {
+    left: 74%;
+    animation-delay: 30ms;
+  }
+  .confetti__piece:nth-child(10) {
+    left: 82%;
+    animation-delay: 90ms;
+  }
+  .confetti__piece:nth-child(11) {
+    left: 89%;
+    animation-delay: 50ms;
+  }
+  .confetti__piece:nth-child(12) {
+    left: 95%;
+    animation-delay: 110ms;
+  }
+
+  @keyframes confetti-fall {
+    0% {
+      opacity: 1;
+      transform: translateY(0) rotate(0);
+    }
+
+    100% {
+      opacity: 0;
+      transform: translateY(7rem) rotate(240deg);
+    }
+  }
 }

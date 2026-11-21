@@ -1,7 +1,8 @@
 import type { Plan, PlanItem, Section } from '../../../shared/types.js';
-import { h, sourceNode, srOnly } from '../dom.js';
+import { announce, h, sourceNode, srOnly } from '../dom.js';
 import { icon, type IconName } from '../icons.js';
 import { impactChip } from './impactChip.js';
+import { puff } from './mascot.js';
 
 /** The brief's three parts, in its order. */
 const SECTIONS: readonly { key: Section; title: string; lede: string; icon: IconName }[] = [
@@ -28,7 +29,17 @@ const SECTIONS: readonly { key: Section; title: string; lede: string; icon: Icon
 export const AI_UNAVAILABLE = 'AI summary unavailable — showing our standard plan.';
 const AI_USED = 'Advice worded with Google Gemini. Every number comes from our own calculations.';
 
+export const ALL_DONE = 'All done for today, nice work!';
+
+/** Today's ticked routine steps, by action id, and where to report a change. */
+export interface Checklist {
+  done: ReadonlySet<string>;
+  onChange(done: ReadonlySet<string>): void;
+}
+
 export interface PlanViewOptions {
+  /** When given, each routine step gets a Done box and the routine shows its progress. */
+  checklist?: Checklist;
   /**
    * False when the air report had no current reading: the plan's category is then only a
    * placeholder, so no AQI colour is shown beside the health advice.
@@ -60,8 +71,8 @@ function bestAt(item: PlanItem): HTMLElement {
   return h('p', { class: 'plan-item__when' }, `Best ${day}at `, timeEl(item));
 }
 
-/** One action as a card: title, why it matters, its impact chip and sources. */
-function itemCard(item: PlanItem, showTime: boolean): HTMLElement {
+/** One action as a card: title, why it matters, its impact chip, sources and a Done box. */
+function itemCard(item: PlanItem, showTime: boolean, done: HTMLElement | null = null): HTMLElement {
   return h(
     'article',
     { class: 'card plan-item' },
@@ -70,7 +81,74 @@ function itemCard(item: PlanItem, showTime: boolean): HTMLElement {
     h('p', { class: 'plan-item__why' }, item.why),
     item.impact ? impactChip(item.impact) : null,
     sources(item),
+    done,
   );
+}
+
+/** Twelve decorative confetti pieces; CSS shows and moves them only when motion is welcome. */
+const confetti = (): HTMLElement =>
+  h(
+    'div',
+    { class: 'confetti', 'aria-hidden': 'true' },
+    ...Array.from({ length: 12 }, () => h('span', { class: 'confetti__piece' })),
+  );
+
+/**
+ * The routine's Done boxes, progress line and celebration. Only ids in today's routine count.
+ * Finishing the routine is announced once, when the last box is ticked; a day that is already
+ * finished is shown as such without announcing it again.
+ */
+function tracker(items: readonly PlanItem[], checklist: Checklist) {
+  const ids = items.map((i) => i.actionId);
+  const done = new Set(ids.filter((id) => checklist.done.has(id)));
+  const total = ids.length;
+  const text = h('p', { class: 'routine-progress', id: 'routine-progress' });
+  const bar = h('progress', {
+    class: 'routine-progress__bar',
+    max: String(total),
+    'aria-labelledby': 'routine-progress',
+  });
+  const party = h(
+    'div',
+    { class: 'celebration' },
+    puff('cheer', 'sm'),
+    confetti(),
+    h('p', { class: 'celebration__text' }, ALL_DONE),
+  );
+
+  const update = () => {
+    text.textContent = `${done.size} of ${total} done`;
+    bar.value = done.size;
+    party.hidden = done.size !== total;
+  };
+  update();
+
+  const box = (item: PlanItem): HTMLElement => {
+    const id = `done-${item.actionId}`;
+    const input = h('input', { type: 'checkbox', class: 'done__box', id });
+    input.checked = done.has(item.actionId);
+    input.addEventListener('change', () => {
+      const wasFinished = done.size === total;
+      if (input.checked) done.add(item.actionId);
+      else done.delete(item.actionId);
+      input.closest('.plan-item')?.toggleAttribute('data-done', input.checked);
+      update();
+      checklist.onChange(new Set(done));
+      if (!wasFinished && done.size === total) announce(ALL_DONE);
+    });
+    return h(
+      'div',
+      { class: 'done' },
+      input,
+      h('label', { for: id, class: 'done__label' }, 'Done', srOnly(`: ${item.title}`)),
+    );
+  };
+
+  return {
+    head: h('div', { class: 'routine-progress__wrap' }, text, bar, party),
+    box,
+    isDone: (item: PlanItem) => done.has(item.actionId),
+  };
 }
 
 /** Sort key for a timed item: its full local timestamp, so tomorrow's 06:00 follows tonight's 22:00. */
@@ -103,21 +181,25 @@ function timeLabel(item: PlanItem, previous: PlanItem | undefined): HTMLElement 
   );
 }
 
-function timeline(items: readonly PlanItem[]): HTMLElement {
+function timeline(items: readonly PlanItem[], checklist?: Checklist): HTMLElement {
   const ordered = timelineOrder(items);
-  return h(
+  const track = checklist ? tracker(items, checklist) : null;
+  const list = h(
     'ol',
     { class: 'timeline' },
-    ...ordered.map((item, i) =>
-      h(
+    ...ordered.map((item, i) => {
+      const card = itemCard(item, false, track ? track.box(item) : null);
+      if (track?.isDone(item)) card.setAttribute('data-done', '');
+      return h(
         'li',
         { class: 'timeline__item' },
         timeLabel(item, ordered[i - 1]),
         h('span', { class: 'timeline__dot', 'aria-hidden': 'true' }),
-        itemCard(item, false),
-      ),
-    ),
+        card,
+      );
+    }),
   );
+  return track ? h('div', { class: 'routine' }, track.head, list) : list;
 }
 
 function cards(items: readonly PlanItem[]): HTMLElement {
@@ -128,12 +210,16 @@ function cards(items: readonly PlanItem[]): HTMLElement {
   );
 }
 
-function planSection(plan: Plan, spec: (typeof SECTIONS)[number]): HTMLElement {
+function planSection(
+  plan: Plan,
+  spec: (typeof SECTIONS)[number],
+  checklist?: Checklist,
+): HTMLElement {
   const items = plan[spec.key];
   const titleId = `plan-section-${spec.key}`;
   let body: HTMLElement;
   if (!items.length) body = h('p', { class: 'plan-section__empty' }, 'Nothing to add here today.');
-  else body = spec.key === 'routine' ? timeline(items) : cards(items);
+  else body = spec.key === 'routine' ? timeline(items, checklist) : cards(items);
   return h(
     'section',
     { class: 'plan-section', 'aria-labelledby': titleId },
@@ -186,7 +272,7 @@ export function renderPlan(el: HTMLElement, plan: Plan, options: PlanViewOptions
       h('span', {}, plan.aiUsed ? AI_USED : AI_UNAVAILABLE),
     ),
     health(plan, hasReading),
-    ...SECTIONS.map((spec) => planSection(plan, spec)),
+    ...SECTIONS.map((spec) => planSection(plan, spec, options.checklist)),
   );
   region(el).removeAttribute('aria-busy');
   el.replaceChildren(view);
