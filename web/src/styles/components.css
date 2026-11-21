@@ -1347,12 +1347,6 @@
   overflow-wrap: anywhere;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .impact-panel:not([hidden]) {
-    animation: reveal var(--duration) var(--ease);
-  }
-}
-
 .impact-panel__title {
   font-size: var(--text-base);
   font-weight: var(--weight-semibold);
@@ -1421,12 +1415,6 @@
 
 .dialog::backdrop {
   background: rgb(14 20 25 / 0.5);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .dialog[open] {
-    animation: rise var(--duration) var(--ease);
-  }
 }
 
 .profile-form {
@@ -1681,20 +1669,6 @@
 
 .method__note {
   color: var(--color-text-muted);
-}
-
-@keyframes reveal {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
 }
 
 /* ---------- Ask panel ---------- */

@@ -1,0 +1,88 @@
+/*
+ * Every decorative animation lives here, inside one block, so people who ask their system for
+ * less motion get none of it (base.css also cuts any remaining duration to near zero). Nothing
+ * here flashes: Puff blinks once every 4 s.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  /* A screen fades and rises in each time the router un-hides it. */
+  .screen:not([hidden]) {
+    animation: screen-in 200ms var(--ease);
+  }
+
+  @keyframes screen-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
+
+  /* Puff floats gently and blinks. */
+  .puff {
+    animation: puff-float 3.2s ease-in-out infinite;
+  }
+
+  @keyframes puff-float {
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+
+  .puff__eye {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: puff-blink 4s infinite;
+  }
+
+  @keyframes puff-blink {
+    0%,
+    92%,
+    100% {
+      transform: none;
+    }
+
+    96% {
+      transform: scaleY(0.1);
+    }
+  }
+
+  /* Cards and the AQI number pop in. */
+  .highlight,
+  .aqi-card {
+    animation: pop-in 260ms var(--ease) backwards;
+  }
+
+  .aqi-number {
+    display: inline-block;
+    animation: pop-in 320ms var(--ease) backwards;
+  }
+
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
+
+  /* An impact panel and the household dialog open with a small movement. */
+  .impact-panel:not([hidden]) {
+    animation: reveal var(--duration) var(--ease);
+  }
+
+  @keyframes reveal {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
+  .dialog[open] {
+    animation: rise var(--duration) var(--ease);
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+}

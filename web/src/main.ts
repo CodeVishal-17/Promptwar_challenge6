@@ -34,6 +34,7 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/components.css';
 import './styles/shell.css';
+import './styles/motion.css';
 
 export type AppApi = Pick<typeof realApi, 'searchPlaces' | 'getAir' | 'getPlan' | 'ask'>;
 
