@@ -272,6 +272,14 @@ You need Node 22 (see `.nvmrc`); Node 20.19 or newer also works.
 
 For a production build, run `npm run build`, then `npm start`, and open `http://localhost:8080`.
 
+### Deploy
+
+`render.yaml` describes one free [Render](https://render.com) web service: it runs `npm ci && npm
+run build`, starts with `npm start`, checks `/healthz`, and sets `TRUST_PROXY=1` for Render's load
+balancer. In Render, choose **New → Blueprint**, pick this repository, and paste your Gemini key
+into `GEMINI_API_KEY` when asked; it stays in Render and never enters the repo. The free plan
+sleeps after 15 idle minutes, so the first visit after that takes a little longer.
+
 ## Scripts
 
 | Script                  | What it does                                                               |

@@ -1,0 +1,21 @@
+# Render Blueprint: one free Node web service that serves the API and the built web app.
+services:
+  - type: web
+    name: clearday
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      # Set in the Render dashboard, never in the repo. Without it the plan is rule-based only.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash-lite
+      # Render's load balancer is one proxy hop in front of the app.
+      - key: TRUST_PROXY
+        value: '1'
