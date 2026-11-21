@@ -216,3 +216,59 @@ describe('askPanel', () => {
     }
   });
 });
+
+describe('askPanel as a chat', () => {
+  const user = () => root.querySelector<HTMLElement>('.chat__msg--user');
+
+  it('greets with Puff, before anything is asked', () => {
+    mount(resolved());
+    const intro = root.querySelector('.chat__msg--intro');
+    expect(intro?.textContent).toContain('Ask me anything about today’s air');
+    expect(intro?.querySelector('svg.puff')?.getAttribute('aria-hidden')).toBe('true');
+    expect(user()?.hidden).toBe(true);
+  });
+
+  it('shows the question as the user’s bubble, outside the live region', async () => {
+    const { send } = mount(resolved());
+    await send('  Should I run?  ');
+    expect(user()?.hidden).toBe(false);
+    expect(user()?.textContent).toBe('Should I run?');
+    expect(user()?.closest('[aria-live]')).toBeNull();
+  });
+
+  it('puts the answer in Puff’s bubble', async () => {
+    const { send } = mount(resolved());
+    await send('Should I run?');
+    expect(root.querySelector('.chat__msg--answer .ask__answer')?.textContent).toBe('Go at dusk.');
+    expect(root.querySelector('.chat__msg--answer')?.hasAttribute('data-active')).toBe(true);
+  });
+
+  it('shows hidden typing dots while thinking', async () => {
+    let finish: (a: Answer) => void = () => {};
+    const { send } = mount(vi.fn<AskFn>(() => new Promise((r) => (finish = r))));
+    await send('Question');
+    const typing = root.querySelector<HTMLElement>('.chat__typing');
+    expect(typing?.hidden).toBe(false);
+    expect(typing?.getAttribute('aria-hidden')).toBe('true');
+    expect(typing?.closest('[aria-live]')).toBeNull();
+    finish({ answer: 'Done.', aiUsed: true });
+    await flush();
+    expect(typing?.hidden).toBe(true);
+  });
+
+  it('the chat comes before the form', () => {
+    mount(resolved());
+    const chat = root.querySelector('.chat') as HTMLElement;
+    const form = root.querySelector('form') as HTMLElement;
+    expect(chat.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('reset hides and empties the user’s bubble', async () => {
+    const { send, panel } = mount(resolved());
+    await send('Should I run?');
+    panel.reset();
+    expect(user()?.hidden).toBe(true);
+    expect(user()?.textContent).toBe('');
+    expect(root.querySelector('.chat__msg--answer')?.hasAttribute('data-active')).toBe(false);
+  });
+});

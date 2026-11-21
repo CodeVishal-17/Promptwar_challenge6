@@ -1,6 +1,7 @@
 import type { AskRequest, Place, Profile } from '../../../shared/types.js';
 import { ask as realAsk, ApiError } from '../api.js';
 import { h } from '../dom.js';
+import { puff } from './mascot.js';
 
 export const MAX_QUESTION = 500;
 export const DISCLAIMER = 'General guidance, not medical advice.';
@@ -11,6 +12,8 @@ export const NO_PLACE = 'Choose a place first.';
 export const RATE_LIMITED = "You've asked a lot in a short time — please wait a few minutes.";
 export const GENERIC_ERROR = "Sorry, I couldn't answer that just now. Please try again.";
 export const STANDARD_ANSWER = "Standard answer — the AI assistant isn't available right now.";
+export const GREETING =
+  "Hi, I'm Puff! Ask me anything about today’s air and I'll answer from the forecast and your plan.";
 
 const SUGGESTIONS = [
   'When is the best time to go outside today?',
@@ -65,6 +68,43 @@ export function mountAskPanel(
   const submit = h('button', { type: 'submit', class: 'btn btn--primary ask__submit' }, 'Ask');
   const answer = h('div', { class: 'ask__answer', 'aria-live': 'polite', 'aria-atomic': 'true' });
 
+  // The chat above the form: Puff's greeting, the question as the user's bubble (outside the
+  // live region, so only the answer is announced), then Puff's answer bubble.
+  const avatar = () => h('span', { class: 'chat__avatar' }, puff('moderate', 'sm'));
+  const userText = h('p', { class: 'chat__text' });
+  const userBubble = h('div', { class: 'chat__msg chat__msg--user', hidden: true }, userText);
+  const typing = h(
+    'span',
+    { class: 'chat__typing', 'aria-hidden': 'true', hidden: true },
+    h('span', { class: 'chat__dot' }),
+    h('span', { class: 'chat__dot' }),
+    h('span', { class: 'chat__dot' }),
+  );
+  const answerBubble = h(
+    'div',
+    { class: 'chat__msg chat__msg--bot chat__msg--answer' },
+    avatar(),
+    h('div', { class: 'chat__bubble' }, typing, answer),
+  );
+  const chat = h(
+    'div',
+    { class: 'chat' },
+    h(
+      'div',
+      { class: 'chat__msg chat__msg--bot chat__msg--intro' },
+      avatar(),
+      h('p', { class: 'chat__bubble' }, GREETING),
+    ),
+    userBubble,
+    answerBubble,
+  );
+
+  /** The answer bubble shows while Puff is thinking or has something to say. */
+  function syncChat(): void {
+    typing.hidden = !busy;
+    answerBubble.toggleAttribute('data-active', busy || answer.childElementCount > 0);
+  }
+
   const question = () => textarea.value.trim();
 
   function sync(): void {
@@ -76,10 +116,12 @@ export function mountAskPanel(
     if (busy) submit.setAttribute('aria-disabled', 'true');
     else submit.removeAttribute('aria-disabled');
     submit.textContent = busy ? 'Thinking…' : 'Ask';
+    syncChat();
   }
 
   function show(...nodes: (HTMLElement | null)[]): void {
     answer.replaceChildren(...nodes.filter((n): n is HTMLElement => n !== null));
+    syncChat();
   }
 
   function finish(): void {
@@ -106,6 +148,8 @@ export function mountAskPanel(
       question: question(),
     };
     const mine = ++generation;
+    userText.textContent = request.question;
+    userBubble.hidden = false;
     busy = true;
     answer.setAttribute('aria-busy', 'true');
     show();
@@ -144,6 +188,7 @@ export function mountAskPanel(
   );
 
   el.replaceChildren(
+    chat,
     h(
       'form',
       { class: 'card ask', novalidate: true, onsubmit: (e) => void onSubmit(e) },
@@ -158,7 +203,6 @@ export function mountAskPanel(
         submit,
       ),
       h('div', { class: 'ask__suggestions' }, ...suggestions),
-      answer,
     ),
   );
   sync();
@@ -166,6 +210,8 @@ export function mountAskPanel(
   return {
     reset() {
       generation++;
+      userText.textContent = '';
+      userBubble.hidden = true;
       show();
       finish();
     },

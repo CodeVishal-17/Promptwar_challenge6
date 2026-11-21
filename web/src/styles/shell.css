@@ -691,3 +691,85 @@ body {
 .confetti {
   display: none;
 }
+
+/* ---------- Ask as a chat ---------- */
+
+.chat {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.chat__msg {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  max-width: 100%;
+}
+
+.chat__msg[hidden] {
+  display: none;
+}
+
+.chat__avatar .puff--sm {
+  width: 3rem;
+  height: 2.5rem;
+}
+
+.chat__bubble {
+  min-width: 0;
+  max-width: 36rem;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md) var(--radius-md) var(--radius-md) 6px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+/* The answer bubble only shows while Puff is thinking or has answered. */
+.chat__msg--answer:not([data-active]) .chat__avatar {
+  display: none;
+}
+
+.chat__msg--answer:not([data-active]) .chat__bubble {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.chat__msg--user {
+  justify-content: flex-end;
+}
+
+.chat__msg--user .chat__text {
+  max-width: 30rem;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md) var(--radius-md) 6px var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-inverse);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.chat__typing {
+  display: inline-flex;
+  gap: 4px;
+  padding: var(--space-1) 0;
+}
+
+.chat__typing[hidden] {
+  display: none;
+}
+
+.chat__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+}
+
+.ask__suggestion {
+  border-radius: var(--radius-pill);
+  background: var(--tile-sky);
+}
