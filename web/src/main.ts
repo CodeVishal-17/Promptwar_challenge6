@@ -1,6 +1,5 @@
-import type { AirReport, Place, Plan, PlanRequest, Profile } from '../../shared/types.js';
+import type { AirReport, Place, PlanRequest, Profile } from '../../shared/types.js';
 import * as realApi from './api.js';
-import { ApiError } from './api.js';
 import { mountAskPanel, type AskPanel } from './components/askPanel.js';
 import { renderAqiCard, renderAqiError, renderAqiSkeleton } from './components/aqiCard.js';
 import { renderEmptyState, type Stage } from './components/emptyState.js';
@@ -19,6 +18,8 @@ import { renderMethod } from './components/method.js';
 import { renderPlan, renderPlanError, renderPlanSkeleton } from './components/planView.js';
 import { openProfileForm } from './components/profileForm.js';
 import { announce } from './dom.js';
+import { AIR_ERRORS, PLAN_ERRORS, errorMessage } from './errors.js';
+import { cachedPlan, clearPlans, planKey, rememberPlan } from './planCache.js';
 import { startRouter, type Router } from './router.js';
 import { CATEGORY_LABEL, formatPlace } from './format.js';
 import {
@@ -60,34 +61,6 @@ const byId = (id: string): HTMLElement => {
 export function renderForecast(report: AirReport): void {
   drawForecast(byId('forecast-body'), report);
   byId('forecast').hidden = false;
-}
-
-type ErrorCopy = Partial<Record<string, string>>;
-
-const COMMON_ERRORS: ErrorCopy = {
-  network: "We couldn't reach Clearday. Check your connection and try again.",
-  timeout: "We couldn't reach Clearday. Check your connection and try again.",
-};
-const AIR_ERRORS: ErrorCopy = {
-  ...COMMON_ERRORS,
-  rate_limited: 'Too many requests in a short time — please wait a few minutes and try again.',
-  air_data_incomplete:
-    'The air-quality model has no reading for this place right now. Please try again later.',
-  air_data_unavailable:
-    'The air-quality service is not responding right now. Please try again in a moment.',
-};
-const PLAN_ERRORS: ErrorCopy = {
-  ...COMMON_ERRORS,
-  rate_limited: 'Too many plan requests in a short time — please wait a few minutes and try again.',
-  air_data_incomplete:
-    'The air-quality model has no reading for this place right now, so we can’t tailor a plan yet.',
-  air_data_unavailable:
-    'The air-quality service is not responding right now. Please try again in a moment.',
-};
-
-function errorMessage(err: unknown, copy: ErrorCopy): string {
-  const code = err instanceof ApiError ? err.code : 'unknown';
-  return copy[code] ?? 'Something went wrong on our side. Please try again.';
 }
 
 // ---------- Today and the app shell ----------
@@ -142,9 +115,6 @@ function toggleSearch(): void {
 
 // ---------- Plan ----------
 
-/** Plans already fetched this visit, by place, profile and local hour. Small and bounded. */
-const planCache = new Map<string, Plan>();
-const PLAN_CACHE_MAX = 20;
 /** Increments on every plan request and place change, so a stale plan is never shown. */
 let planGeneration = 0;
 /**
@@ -156,22 +126,7 @@ let loaded: { place: Place; hasReading: boolean } | null = null;
 /** The mounted Q&A panel, so a place change can clear its answer. */
 let askPanel: AskPanel | null = null;
 
-const pad = (n: number) => String(n).padStart(2, '0');
-
-/** `lat,lon|profile|YYYY-MM-DDTHH` in the browser's local time: a new hour means a new plan. */
-export function planKey(place: Place, profile: Profile, now = new Date()): string {
-  const hour = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}`;
-  return `${place.lat},${place.lon}|${JSON.stringify(profile)}|${hour}`;
-}
-
-function remember(key: string, plan: Plan): void {
-  planCache.delete(key);
-  planCache.set(key, plan);
-  if (planCache.size > PLAN_CACHE_MAX) {
-    const oldest = planCache.keys().next().value;
-    if (oldest !== undefined) planCache.delete(oldest);
-  }
-}
+export { planKey } from './planCache.js';
 
 /**
  * Fetches and shows the household plan, from memory when the place, profile and hour are
@@ -197,7 +152,7 @@ export async function requestPlan(
     announce("We couldn't load your plan.");
   };
 
-  let plan = planCache.get(key);
+  let plan = cachedPlan(key);
   if (!plan) {
     renderPlanSkeleton(body);
     drawToday('loading');
@@ -220,7 +175,9 @@ export async function requestPlan(
   const ticks = doneKey(place);
   const checklist = {
     done: loadDone(ticks),
-    onChange: (done: ReadonlySet<string>) => saveDone(ticks, done),
+    onChange: (done: ReadonlySet<string>) => {
+      saveDone(ticks, done);
+    },
   };
   try {
     renderPlan(body, plan, { hasReading, checklist });
@@ -228,7 +185,7 @@ export async function requestPlan(
     fail(err);
     return;
   }
-  remember(key, plan);
+  rememberPlan(key, plan);
   drawToday(plan);
   announce('Your plan is ready.');
 }
@@ -261,7 +218,9 @@ function onboardThenPlan(place: Place, hasReading: boolean): void {
       saveProfile(profile);
       done(profile);
     },
-    () => done(loadProfile()),
+    () => {
+      done(loadProfile());
+    },
   );
 }
 
@@ -361,7 +320,7 @@ async function showPlace(place: Place): Promise<void> {
  */
 export async function boot(deps: BootDeps = {}): Promise<void> {
   api = { ...realApi, ...deps.api };
-  planCache.clear();
+  clearPlans();
   currentPlace = null;
   todayReport = null;
   delete document.body.dataset.sky;

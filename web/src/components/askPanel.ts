@@ -42,6 +42,131 @@ function paragraphs(answer: string): HTMLElement[] {
     .map((part) => h('p', { class: 'ask__paragraph' }, part));
 }
 
+const avatar = (): HTMLElement => h('span', { class: 'chat__avatar' }, puff('moderate', 'sm'));
+const message = (text: string): HTMLElement => h('p', { class: 'ask__message' }, text);
+
+/**
+ * The chat above the form: Puff's greeting, the question as the user's bubble (outside the
+ * live region, so only the answer is announced), then Puff's answer bubble, which shows while
+ * Puff is thinking or has something to say.
+ */
+function chatView() {
+  const answer = h('div', { class: 'ask__answer', 'aria-live': 'polite', 'aria-atomic': 'true' });
+  const userText = h('p', { class: 'chat__text' });
+  const userBubble = h('div', { class: 'chat__msg chat__msg--user', hidden: true }, userText);
+  const dots = [1, 2, 3].map(() => h('span', { class: 'chat__dot' }));
+  const typing = h('span', { class: 'chat__typing', 'aria-hidden': 'true', hidden: true }, ...dots);
+  const answerBubble = h(
+    'div',
+    { class: 'chat__msg chat__msg--bot chat__msg--answer' },
+    avatar(),
+    h('div', { class: 'chat__bubble' }, typing, answer),
+  );
+  const intro = h(
+    'div',
+    { class: 'chat__msg chat__msg--bot chat__msg--intro' },
+    avatar(),
+    h('p', { class: 'chat__bubble' }, GREETING),
+  );
+  let thinking = false;
+  const sync = (): void => {
+    typing.hidden = !thinking;
+    answerBubble.toggleAttribute('data-active', thinking || answer.childElementCount > 0);
+  };
+  return {
+    el: h('div', { class: 'chat' }, intro, userBubble, answerBubble),
+    /** The user's question in its bubble; empty text hides the bubble. */
+    question(text: string): void {
+      userText.textContent = text;
+      userBubble.hidden = text === '';
+    },
+    /** Typing dots and aria-busy while waiting; cleared before the answer lands, or some
+     * screen readers stay silent. */
+    thinking(on: boolean): void {
+      thinking = on;
+      if (on) answer.setAttribute('aria-busy', 'true');
+      else answer.removeAttribute('aria-busy');
+      sync();
+    },
+    answer(...nodes: (HTMLElement | null)[]): void {
+      answer.replaceChildren(...nodes.filter((n): n is HTMLElement => n !== null));
+      sync();
+    },
+  };
+}
+
+/** The question form: label, privacy note, textarea, counter, Ask button and suggestions. */
+function questionForm(id: string, onSuggest: (text: string) => void) {
+  const textarea = h('textarea', {
+    id: `${id}-question`,
+    class: 'input ask__input',
+    rows: '3',
+    'aria-describedby': `${id}-privacy ${id}-count`,
+  });
+  const counter = h('p', { class: 'ask__count', id: `${id}-count` });
+  const submit = h('button', { type: 'submit', class: 'btn btn--primary ask__submit' }, 'Ask');
+  const suggestions = SUGGESTIONS.map((text) =>
+    h(
+      'button',
+      {
+        type: 'button',
+        class: 'ask__suggestion',
+        onclick: () => {
+          onSuggest(text);
+        },
+      },
+      text,
+    ),
+  );
+  const form = h(
+    'form',
+    { class: 'card ask', novalidate: true },
+    h('label', { class: 'field-label', for: textarea.id }, "Ask about today's air"),
+    h('p', { class: 'ask__privacy', id: `${id}-privacy` }, ASK_PRIVACY),
+    textarea,
+    h(
+      'div',
+      { class: 'ask__row' },
+      h('p', { class: 'ask__disclaimer' }, DISCLAIMER),
+      counter,
+      submit,
+    ),
+    h('div', { class: 'ask__suggestions' }, ...suggestions),
+  );
+  return { form, textarea, counter, submit };
+}
+
+type QuestionForm = ReturnType<typeof questionForm>;
+
+/** Counter and button state. While thinking the button is aria-disabled, not disabled, so
+ * keyboard focus stays on it. */
+function syncForm(ui: QuestionForm, busy: boolean): void {
+  const n = ui.textarea.value.trim().length;
+  ui.counter.textContent = `${String(n)}/${String(MAX_QUESTION)}`;
+  ui.counter.classList.toggle('ask__count--over', n > MAX_QUESTION);
+  ui.submit.disabled = !busy && (n === 0 || n > MAX_QUESTION);
+  if (busy) ui.submit.setAttribute('aria-disabled', 'true');
+  else ui.submit.removeAttribute('aria-disabled');
+  ui.submit.textContent = busy ? 'Thinking…' : 'Ask';
+}
+
+const toRequest = ({ place, profile }: AskContext, question: string): AskRequest => ({
+  lat: place.lat,
+  lon: place.lon,
+  ...(place.countryCode ? { countryCode: place.countryCode } : {}),
+  profile,
+  question,
+});
+
+/** The answer's paragraphs, with a note when it is the server's standard text. */
+const answerNodes = (out: { answer: string; aiUsed: boolean }): (HTMLElement | null)[] => [
+  ...paragraphs(out.answer),
+  out.aiUsed ? null : h('p', { class: 'ask__note' }, STANDARD_ANSWER),
+];
+
+const errorNode = (err: unknown): HTMLElement =>
+  message(err instanceof ApiError && err.code === 'rate_limited' ? RATE_LIMITED : GENERIC_ERROR);
+
 /**
  * A grounded Q&A form. The server answers from today's air and the household plan, or returns
  * its own fixed text when the AI is unavailable. The answer region is a polite live region, so
@@ -53,167 +178,60 @@ export function mountAskPanel(
   deps: { ask?: typeof realAsk } = {},
 ): AskPanel {
   const ask = deps.ask ?? realAsk;
-  const id = `ask-${++panels}`;
+  const chat = chatView();
+  const ui = questionForm(`ask-${String(++panels)}`, (text) => {
+    ui.textarea.value = text;
+    sync();
+    ui.textarea.focus();
+  });
   let generation = 0;
   let busy = false;
-
-  const textarea = h('textarea', {
-    id: `${id}-question`,
-    class: 'input ask__input',
-    rows: '3',
-    'aria-describedby': `${id}-privacy ${id}-count`,
-  });
-  const privacy = h('p', { class: 'ask__privacy', id: `${id}-privacy` }, ASK_PRIVACY);
-  const counter = h('p', { class: 'ask__count', id: `${id}-count` });
-  const submit = h('button', { type: 'submit', class: 'btn btn--primary ask__submit' }, 'Ask');
-  const answer = h('div', { class: 'ask__answer', 'aria-live': 'polite', 'aria-atomic': 'true' });
-
-  // The chat above the form: Puff's greeting, the question as the user's bubble (outside the
-  // live region, so only the answer is announced), then Puff's answer bubble.
-  const avatar = () => h('span', { class: 'chat__avatar' }, puff('moderate', 'sm'));
-  const userText = h('p', { class: 'chat__text' });
-  const userBubble = h('div', { class: 'chat__msg chat__msg--user', hidden: true }, userText);
-  const typing = h(
-    'span',
-    { class: 'chat__typing', 'aria-hidden': 'true', hidden: true },
-    h('span', { class: 'chat__dot' }),
-    h('span', { class: 'chat__dot' }),
-    h('span', { class: 'chat__dot' }),
-  );
-  const answerBubble = h(
-    'div',
-    { class: 'chat__msg chat__msg--bot chat__msg--answer' },
-    avatar(),
-    h('div', { class: 'chat__bubble' }, typing, answer),
-  );
-  const chat = h(
-    'div',
-    { class: 'chat' },
-    h(
-      'div',
-      { class: 'chat__msg chat__msg--bot chat__msg--intro' },
-      avatar(),
-      h('p', { class: 'chat__bubble' }, GREETING),
-    ),
-    userBubble,
-    answerBubble,
-  );
-
-  /** The answer bubble shows while Puff is thinking or has something to say. */
-  function syncChat(): void {
-    typing.hidden = !busy;
-    answerBubble.toggleAttribute('data-active', busy || answer.childElementCount > 0);
-  }
-
-  const question = () => textarea.value.trim();
-
-  function sync(): void {
-    const n = question().length;
-    counter.textContent = `${n}/${MAX_QUESTION}`;
-    counter.classList.toggle('ask__count--over', n > MAX_QUESTION);
-    // aria-disabled, not disabled, while thinking: keyboard focus stays on the button.
-    submit.disabled = !busy && (n === 0 || n > MAX_QUESTION);
-    if (busy) submit.setAttribute('aria-disabled', 'true');
-    else submit.removeAttribute('aria-disabled');
-    submit.textContent = busy ? 'Thinking…' : 'Ask';
-    syncChat();
-  }
-
-  function show(...nodes: (HTMLElement | null)[]): void {
-    answer.replaceChildren(...nodes.filter((n): n is HTMLElement => n !== null));
-    syncChat();
-  }
-
-  function finish(): void {
-    busy = false;
-    answer.removeAttribute('aria-busy');
+  const sync = (): void => {
+    syncForm(ui, busy);
+  };
+  const setBusy = (on: boolean): void => {
+    busy = on;
+    chat.thinking(on);
     sync();
-  }
+  };
 
-  async function onSubmit(event: Event): Promise<void> {
-    event.preventDefault();
-    const n = question().length;
-    if (busy || n === 0 || n > MAX_QUESTION) return;
+  const submit = async (): Promise<void> => {
+    const question = ui.textarea.value.trim();
+    if (busy || question.length === 0 || question.length > MAX_QUESTION) return;
     const context = getContext();
     if (!context) {
-      show(h('p', { class: 'ask__message' }, NO_PLACE));
+      chat.answer(message(NO_PLACE));
       return;
     }
-    const { place, profile } = context;
-    const request: AskRequest = {
-      lat: place.lat,
-      lon: place.lon,
-      ...(place.countryCode ? { countryCode: place.countryCode } : {}),
-      profile,
-      question: question(),
-    };
     const mine = ++generation;
-    userText.textContent = request.question;
-    userBubble.hidden = false;
-    busy = true;
-    answer.setAttribute('aria-busy', 'true');
-    show();
-    sync();
+    chat.question(question);
+    chat.answer();
+    setBusy(true);
+    let reply: (HTMLElement | null)[];
     try {
-      const out = await ask(request);
-      if (mine !== generation) return;
-      finish(); // not busy when the text lands, or some screen readers stay silent
-      show(
-        ...paragraphs(out.answer),
-        out.aiUsed ? null : h('p', { class: 'ask__note' }, STANDARD_ANSWER),
-      );
+      reply = answerNodes(await ask(toRequest(context, question)));
     } catch (err) {
-      if (mine !== generation) return;
-      finish();
-      const limited = err instanceof ApiError && err.code === 'rate_limited';
-      show(h('p', { class: 'ask__message' }, limited ? RATE_LIMITED : GENERIC_ERROR));
+      reply = [errorNode(err)];
     }
-  }
+    if (mine !== generation) return;
+    setBusy(false);
+    chat.answer(...reply);
+  };
 
-  textarea.addEventListener('input', sync);
-  const suggestions = SUGGESTIONS.map((text) =>
-    h(
-      'button',
-      {
-        type: 'button',
-        class: 'ask__suggestion',
-        onclick: () => {
-          textarea.value = text;
-          sync();
-          textarea.focus();
-        },
-      },
-      text,
-    ),
-  );
-
-  el.replaceChildren(
-    chat,
-    h(
-      'form',
-      { class: 'card ask', novalidate: true, onsubmit: (e) => void onSubmit(e) },
-      h('label', { class: 'field-label', for: textarea.id }, "Ask about today's air"),
-      privacy,
-      textarea,
-      h(
-        'div',
-        { class: 'ask__row' },
-        h('p', { class: 'ask__disclaimer' }, DISCLAIMER),
-        counter,
-        submit,
-      ),
-      h('div', { class: 'ask__suggestions' }, ...suggestions),
-    ),
-  );
+  ui.textarea.addEventListener('input', sync);
+  ui.form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    void submit();
+  });
+  el.replaceChildren(chat.el, ui.form);
   sync();
 
   return {
     reset() {
       generation++;
-      userText.textContent = '';
-      userBubble.hidden = true;
-      show();
-      finish();
+      chat.question('');
+      chat.answer();
+      setBusy(false);
     },
   };
 }

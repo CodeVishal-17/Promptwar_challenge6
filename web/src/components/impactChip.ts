@@ -77,7 +77,9 @@ export function impactChip(impact: Impact): HTMLElement {
     button.setAttribute('aria-expanded', String(open));
     details.hidden = !open;
   };
-  button.addEventListener('click', () => setOpen(button.getAttribute('aria-expanded') !== 'true'));
+  button.addEventListener('click', () => {
+    setOpen(button.getAttribute('aria-expanded') !== 'true');
+  });
 
   const wrap = h('div', { class: 'impact' }, button, details);
   wrap.addEventListener('keydown', (e) => {
