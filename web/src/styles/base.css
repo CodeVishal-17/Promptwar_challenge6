@@ -22,7 +22,9 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--color-bg);
+  background:
+    linear-gradient(180deg, var(--sky-top) 0, var(--sky-mid) 18rem, var(--color-bg) 36rem) no-repeat,
+    var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: var(--text-base);

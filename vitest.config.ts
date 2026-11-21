@@ -11,6 +11,11 @@ export default defineConfig({
         extends: true,
         test: { name: 'web', include: ['tests/web/**/*.test.ts'], environment: 'jsdom' },
       },
+      {
+        extends: true,
+        // Stylesheet checks read the CSS from disk (Vitest stubs CSS imports, even with ?raw).
+        test: { name: 'styles', include: ['tests/styles/**/*.test.ts'], environment: 'node' },
+      },
     ],
     coverage: {
       provider: 'v8',
