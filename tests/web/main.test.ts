@@ -634,3 +634,33 @@ describe('sky tint', () => {
     expect(document.body.dataset.sky).toBeUndefined();
   });
 });
+
+describe('review fixes', () => {
+  it('a household saved before any place counts as the first-visit setup', async () => {
+    localStorage.clear();
+    await boot(deps());
+    byText(document, 'Edit household')?.click();
+    const dialog = document.querySelector('dialog') as HTMLDialogElement;
+    byText(dialog, 'Next')?.click();
+    byText(dialog, 'Next')?.click();
+    byText(dialog, 'Save')?.click();
+    await flush();
+    expect(hasSeenOnboarding()).toBe(true);
+
+    searchPlaces.mockResolvedValueOnce([{ ...PLACE, name: 'Lima', countryCode: 'PE' }]);
+    await pickFromSearch();
+    await flush();
+    expect(document.querySelector('dialog')).toBeNull();
+    expect(getPlan).toHaveBeenCalledOnce();
+  });
+
+  it('the place pill closes the search it opened, so its expanded state stays true', async () => {
+    savePlace(PLACE);
+    await boot(deps());
+    section('place-pill').click();
+    expect(section('search-panel').hidden).toBe(false);
+    section('place-pill').click();
+    expect(section('search-panel').hidden).toBe(true);
+    expect(section('place-pill').getAttribute('aria-expanded')).toBe('false');
+  });
+});

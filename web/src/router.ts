@@ -58,7 +58,9 @@ export function startRouter(opts: { placeName: () => string | null }): Router {
   };
 
   // The hashchange that follows go() names the screen already shown, so it changes nothing.
+  // An in-page link such as the skip link (#main) is not a route, so the screen stays.
   const onHashChange = () => {
+    if (location.hash !== '' && !location.hash.startsWith('#/')) return;
     const next = parseRoute(location.hash);
     if (next === route) return;
     route = next;

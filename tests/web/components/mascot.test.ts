@@ -168,6 +168,13 @@ describe('puffLine', () => {
     );
   });
 
+  it('names the weekday when the cleaner spell is two days away', () => {
+    const report = reportIn('unhealthy', 162, [best('2026-11-22T06:00', 90)]);
+    expect(puffLine(report).text).toBe(
+      'Rough air today, but I found you a cleaner spell on Sunday at 06:00.',
+    );
+  });
+
   it('ignores a "best" window that is not cleaner than now', () => {
     const report = reportIn('unhealthy', 162, [best('2026-11-20T16:00', 170)]);
     expect(puffLine(report).text).toBe('Rough air today, so keep outdoor effort light.');

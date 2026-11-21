@@ -4,6 +4,8 @@ import {
   POLLUTANT_LABEL,
   formatLocalTime,
   formatPlace,
+  dayOffset,
+  weekday,
 } from '../../web/src/format.js';
 
 describe('CATEGORY_LABEL', () => {
@@ -75,5 +77,23 @@ describe('formatPlace', () => {
     expect(
       formatPlace({ name: 'Current location', country: '', countryCode: '', lat: 1, lon: 2 }),
     ).toBe('Current location');
+  });
+});
+
+describe('dayOffset', () => {
+  it.each([
+    ['2026-11-20T14:00', '2026-11-20T18:00', 0],
+    ['2026-11-20T23:00', '2026-11-21T06:00', 1],
+    ['2026-11-20T10:00', '2026-11-22T06:00', 2],
+    ['2026-12-31T22:00', '2027-01-01T07:00', 1],
+  ])('%s → %s is %i days', (from, to, days) => {
+    expect(dayOffset(from, to)).toBe(days);
+  });
+});
+
+describe('weekday', () => {
+  it('names a local date without the browser zone shifting it', () => {
+    expect(weekday('2026-11-22', 'long')).toBe('Sunday');
+    expect(weekday('2026-11-22', 'short')).toBe('Sun');
   });
 });

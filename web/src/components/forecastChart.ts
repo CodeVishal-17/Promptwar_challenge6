@@ -1,6 +1,6 @@
 import type { AirReport, AirWindow, AqiCategory, AqiReading } from '../../../shared/types.js';
 import { h } from '../dom.js';
-import { CATEGORY_LABEL, formatLocalTime } from '../format.js';
+import { CATEGORY_LABEL, formatLocalTime, weekday } from '../format.js';
 
 export interface Bar {
   x: number;
@@ -113,13 +113,6 @@ const LABEL_CLASH = 22;
 
 const hhmm = (time: string): string => formatLocalTime(time);
 const hourOf = (time: string): number => Number(time.slice(11, 13));
-
-/** Weekday name for a local `YYYY-MM-DD` date. UTC keeps the browser's zone from shifting it. */
-function weekday(date: string, style: 'long' | 'short'): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  if (Number.isNaN(d.getTime())) return date;
-  return new Intl.DateTimeFormat('en-GB', { weekday: style, timeZone: 'UTC' }).format(d);
-}
 
 /** The window with its weekday: in a 48-hour view, "19:00" alone could be today or tomorrow. */
 const windowRange = (w: AirWindow): string =>

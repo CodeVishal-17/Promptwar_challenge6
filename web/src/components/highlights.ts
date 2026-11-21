@@ -1,6 +1,6 @@
 import type { AirReport, Plan } from '../../../shared/types.js';
 import { h } from '../dom.js';
-import { formatLocalTime } from '../format.js';
+import { dayOffset, formatLocalTime, weekday } from '../format.js';
 
 /** The plan as Today knows it: loaded, still on its way, or failed. */
 export type PlanState = Plan | 'loading' | 'unavailable';
@@ -41,8 +41,11 @@ function card(c: Card): HTMLElement {
 function cleanest(report: AirReport): Card | null {
   const best = report.windows.find((w) => w.kind === 'best');
   if (!best) return null;
-  const now = report.now;
-  const day = now && best.start.slice(0, 10) !== now.time.slice(0, 10) ? 'Tomorrow ' : '';
+  // Dated against the current hour, or the first hourly reading when this hour has none.
+  const today = report.now?.time ?? report.hourly.find((r) => r !== null)?.time;
+  const days = today ? dayOffset(today, best.start) : 0;
+  const day =
+    days <= 0 ? '' : days === 1 ? 'Tomorrow ' : `${weekday(best.start.slice(0, 10), 'long')} `;
   return {
     kind: 'cleanest',
     href: '#/forecast',

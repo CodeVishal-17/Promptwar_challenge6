@@ -1,6 +1,6 @@
 import type { AirReport, AqiCategory } from '../../../shared/types.js';
 import { h } from '../dom.js';
-import { formatLocalTime } from '../format.js';
+import { dayOffset, formatLocalTime, weekday } from '../format.js';
 
 /**
  * Puff, Clearday's cloud mascot. His face follows the air honestly: he grins only on good days,
@@ -128,7 +128,7 @@ export const WELCOME_LINE: Line = {
 
 type Copy = { plain: string; cleaner?: (when: string) => string; emoji: string };
 
-/** What Puff says per category. `when` is "at 16:00" or "tomorrow at 07:00", from the report. */
+/** What Puff says per category. `when` is "at 16:00", "tomorrow at 07:00" or "on Sunday at 06:00". */
 const COPY: Record<AqiCategory | 'none', Copy> = {
   good: { plain: 'Lovely air today! A great day to walk or cycle.', emoji: '🚲' },
   moderate: {
@@ -164,7 +164,13 @@ export function puffLine(report: AirReport): Line {
   const copy = COPY[now?.category ?? 'none'];
   const best = report.windows.find((w) => w.kind === 'best');
   if (now && copy.cleaner && best && best.meanAqi < now.aqi) {
-    const day = best.start.slice(0, 10) === now.time.slice(0, 10) ? 'at' : 'tomorrow at';
+    const days = dayOffset(now.time, best.start);
+    const day =
+      days <= 0
+        ? 'at'
+        : days === 1
+          ? 'tomorrow at'
+          : `on ${weekday(best.start.slice(0, 10), 'long')} at`;
     return { text: copy.cleaner(`${day} ${formatLocalTime(best.start)}`), emoji: copy.emoji };
   }
   return { text: copy.plain, emoji: copy.emoji };

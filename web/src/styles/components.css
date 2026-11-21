@@ -13,9 +13,12 @@
  * muted grey fall under 4.5:1. Inside .on-sky both point at the body text colour (9.4:1).
  */
 .on-sky,
-.site-header {
+.site-header,
+.search-panel {
   --color-text-muted: var(--color-text);
   --color-accent: var(--color-text);
+  /* A deeper red for messages on the sky: 5.4:1 on its darkest tint (#8a2a22). */
+  --color-danger: #8a2a22;
 }
 
 /* Use my location: a sunny button with dark text. */

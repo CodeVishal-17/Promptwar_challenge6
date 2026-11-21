@@ -54,6 +54,27 @@ describe('renderHighlights', () => {
     expect(value('cleanest')).toBe('Tomorrow 07:00–09:00');
   });
 
+  it('names the weekday when the cleanest window is two days away', () => {
+    renderHighlights(
+      el,
+      withBest({ ...BEST, start: '2026-11-22T06:00', end: '2026-11-22T08:00' }),
+      makePlan(),
+    );
+    expect(value('cleanest')).toBe('Sunday 06:00–08:00');
+  });
+
+  it('dates the window from the first hourly reading when there is no reading now', () => {
+    renderHighlights(
+      el,
+      makeReport({
+        now: null,
+        windows: [{ ...BEST, start: '2026-11-21T07:00', end: '2026-11-21T09:00' }],
+      }),
+      makePlan(),
+    );
+    expect(value('cleanest')).toBe('Tomorrow 07:00–09:00');
+  });
+
   it('leaves out cleanest hours when there is no best window', () => {
     renderHighlights(el, makeReport({ windows: [{ ...BEST, kind: 'worst' }] }), makePlan());
     expect(card('cleanest')).toBeNull();

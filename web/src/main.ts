@@ -136,7 +136,7 @@ function openSearch(): void {
 }
 
 function toggleSearch(): void {
-  if (byId('search-panel').hidden) openSearch();
+  if (byId('search-panel').hidden || router?.current() !== 'today') openSearch();
   else setSearchOpen(false);
 }
 
@@ -240,6 +240,8 @@ export async function requestPlan(
 function editProfile(): void {
   openProfileForm(loadProfile(), (profile) => {
     saveProfile(profile);
+    // Saved from My plan before any place: that was the first-visit setup, so don't ask again.
+    markOnboardingSeen();
     if (loaded) void requestPlan(loaded.place, profile, { hasReading: loaded.hasReading });
   });
 }
@@ -367,7 +369,7 @@ export async function boot(deps: BootDeps = {}): Promise<void> {
   router = startRouter({ placeName: () => currentPlace?.name ?? null });
   showPuff('wave', WELCOME_LINE);
   setStage('no-place');
-  byId('place-pill').onclick = openSearch;
+  byId('place-pill').onclick = toggleSearch;
   byId('change-place').onclick = toggleSearch;
   renderMethod(byId('method-body'));
   byId('edit-profile').onclick = editProfile;

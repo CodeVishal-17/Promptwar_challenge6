@@ -57,3 +57,16 @@ export function formatPlace(p: Place): string {
   const parts = [p.name, p.admin1 && p.admin1 !== p.name ? p.admin1 : '', p.country];
   return parts.filter(Boolean).join(', ');
 }
+
+/** Weekday name for a local `YYYY-MM-DD` date. UTC keeps the browser's zone from shifting it. */
+export function weekday(date: string, style: 'long' | 'short'): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return date;
+  return new Intl.DateTimeFormat('en-GB', { weekday: style, timeZone: 'UTC' }).format(d);
+}
+
+/** Whole calendar days from one local wall-clock time to another (dates only, no zone). */
+export function dayOffset(from: string, to: string): number {
+  const day = (iso: string) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
+  return Math.round((day(to) - day(from)) / 86_400_000);
+}

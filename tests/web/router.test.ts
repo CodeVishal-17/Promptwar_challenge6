@@ -136,6 +136,16 @@ describe('startRouter', () => {
     expect(document.activeElement).toBe(input);
   });
 
+  it('keeps the screen when an in-page link such as the skip link changes the hash', () => {
+    router = startRouter({ placeName: () => place });
+    go('#/plan');
+    const heading = screen('plan').querySelector('h1');
+    go('#main');
+    expect(visible()).toEqual(['plan']);
+    expect(router.current()).toBe('plan');
+    expect(document.activeElement).toBe(heading);
+  });
+
   it('stop removes the listener', () => {
     router = startRouter({ placeName: () => place });
     router.stop();

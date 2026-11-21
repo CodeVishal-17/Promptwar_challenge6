@@ -125,6 +125,13 @@
   color: var(--color-accent);
 }
 
+/* Keyboard focus scrolled to the bottom edge is never hidden under the floating tab bar. */
+@media (max-width: 47.99rem) {
+  html {
+    scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+}
+
 /* Room under the page for the floating tab bar. */
 body {
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
