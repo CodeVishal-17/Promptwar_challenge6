@@ -24,6 +24,8 @@ export function parseRoute(hash: string): Route {
 
 export interface Router {
   current(): Route;
+  /** Shows a screen now (and records it in the address), moving focus to it unless told not to. */
+  go(route: Route, moveFocus?: boolean): void;
   /** Re-applies the page title, e.g. after the place changes. */
   refresh(): void;
   stop(): void;
@@ -55,8 +57,11 @@ export function startRouter(opts: { placeName: () => string | null }): Router {
     }
   };
 
+  // The hashchange that follows go() names the screen already shown, so it changes nothing.
   const onHashChange = () => {
-    route = parseRoute(location.hash);
+    const next = parseRoute(location.hash);
+    if (next === route) return;
+    route = next;
     apply(true);
   };
 
@@ -65,6 +70,11 @@ export function startRouter(opts: { placeName: () => string | null }): Router {
 
   return {
     current: () => route,
+    go(next, moveFocus = true) {
+      route = next;
+      if (location.hash !== `#/${next}`) location.hash = `#/${next}`;
+      apply(moveFocus);
+    },
     refresh: title,
     stop: () => window.removeEventListener('hashchange', onHashChange),
   };

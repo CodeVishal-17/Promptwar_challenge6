@@ -3,12 +3,23 @@ import * as realApi from './api.js';
 import { ApiError } from './api.js';
 import { mountAskPanel, type AskPanel } from './components/askPanel.js';
 import { renderAqiCard, renderAqiError, renderAqiSkeleton } from './components/aqiCard.js';
+import { renderEmptyState, type Stage } from './components/emptyState.js';
 import { renderForecast as drawForecast } from './components/forecastChart.js';
+import { renderHighlights, type PlanState } from './components/highlights.js';
 import { mountLocationSearch } from './components/locationSearch.js';
+import {
+  WELCOME_LINE,
+  moodFor,
+  puffLine,
+  puffSays,
+  type Line,
+  type Mood,
+} from './components/mascot.js';
 import { renderMethod } from './components/method.js';
 import { renderPlan, renderPlanError, renderPlanSkeleton } from './components/planView.js';
 import { openProfileForm } from './components/profileForm.js';
 import { announce } from './dom.js';
+import { startRouter, type Router } from './router.js';
 import { CATEGORY_LABEL, formatPlace } from './format.js';
 import {
   hasSeenOnboarding,
@@ -22,6 +33,7 @@ import './styles/fonts.css';
 import './styles/tokens.css';
 import './styles/base.css';
 import './styles/components.css';
+import './styles/shell.css';
 
 export type AppApi = Pick<typeof realApi, 'searchPlaces' | 'getAir' | 'getPlan' | 'ask'>;
 
@@ -72,6 +84,56 @@ const PLAN_ERRORS: ErrorCopy = {
 function errorMessage(err: unknown, copy: ErrorCopy): string {
   const code = err instanceof ApiError ? err.code : 'unknown';
   return copy[code] ?? 'Something went wrong on our side. Please try again.';
+}
+
+// ---------- Today and the app shell ----------
+
+let router: Router | null = null;
+/** The place on screen (or loading), for the header and the page title. */
+let currentPlace: Place | null = null;
+/** The air report on Today, so the highlight cards can be redrawn when the plan lands. */
+let todayReport: AirReport | null = null;
+
+const CHECKING_LINE: Line = { text: 'Let me check the air for you…', emoji: '🔍' };
+const OOPS_LINE: Line = { text: "Oops, I couldn't reach the air data just now.", emoji: '☁️' };
+
+function showPuff(mood: Mood, line: Line): void {
+  byId('today-puff').replaceChildren(puffSays(mood, line));
+}
+
+/** Forecast, My plan and Ask show why they are empty until the place's air is on screen. */
+function setStage(stage: Stage | 'ready'): void {
+  for (const id of ['forecast', 'plan', 'ask']) {
+    const empty = byId(`${id}-empty`);
+    empty.hidden = stage === 'ready';
+    if (stage !== 'ready') renderEmptyState(empty, stage);
+  }
+}
+
+/** Today's highlight cards, for the report on screen and the plan as it stands. */
+function drawToday(plan: PlanState): void {
+  if (!todayReport) return;
+  renderHighlights(byId('highlights'), todayReport, plan);
+  byId('highlights').hidden = false;
+}
+
+function setSearchOpen(open: boolean): void {
+  byId('search-panel').hidden = !open;
+  for (const id of ['place-pill', 'change-place']) {
+    byId(id).setAttribute('aria-expanded', String(open));
+  }
+}
+
+/** Reopens the place search on Today, from wherever the user is. */
+function openSearch(): void {
+  router?.go('today', false);
+  setSearchOpen(true);
+  document.querySelector<HTMLInputElement>('#location-search input')?.focus();
+}
+
+function toggleSearch(): void {
+  if (byId('search-panel').hidden) openSearch();
+  else setSearchOpen(false);
 }
 
 // ---------- Plan ----------
@@ -127,12 +189,14 @@ export async function requestPlan(
   };
   const fail = (err: unknown) => {
     renderPlanError(body, retry, errorMessage(err, PLAN_ERRORS));
+    drawToday('unavailable');
     announce("We couldn't load your plan.");
   };
 
   let plan = planCache.get(key);
   if (!plan) {
     renderPlanSkeleton(body);
+    drawToday('loading');
     const request: PlanRequest = {
       lat: place.lat,
       lon: place.lon,
@@ -155,6 +219,7 @@ export async function requestPlan(
     return;
   }
   remember(key, plan);
+  drawToday(plan);
   announce('Your plan is ready.');
 }
 
@@ -199,7 +264,10 @@ let generation = 0;
  */
 function resetDependents(): void {
   loaded = null;
+  todayReport = null;
   planGeneration++;
+  byId('highlights').hidden = true;
+  byId('highlights').replaceChildren();
   askPanel?.reset();
   byId('ask').hidden = true;
   for (const id of ['forecast', 'plan']) {
@@ -217,12 +285,22 @@ function resetDependents(): void {
 async function showPlace(place: Place): Promise<void> {
   const mine = ++generation;
   resetDependents();
+  currentPlace = place;
+  router?.refresh();
+  byId('place-pill-name').textContent = place.name;
+  byId('place-pill').hidden = false;
+  byId('change-place').hidden = false;
+  setSearchOpen(false);
+  byId('now').hidden = false;
+  setStage('loading');
+  showPuff('wave', CHECKING_LINE);
   const nowBody = byId('now-body');
-  document.title = `${place.name} — Clearday`;
   renderAqiSkeleton(nowBody);
 
   const fail = (err: unknown) => {
     resetDependents();
+    setStage('failed');
+    showPuff('none', OOPS_LINE);
     const message = errorMessage(err, AIR_ERRORS);
     renderAqiError(nowBody, message, () => {
       byId('now-title').focus();
@@ -243,10 +321,13 @@ async function showPlace(place: Place): Promise<void> {
   try {
     renderAqiCard(nowBody, report, place);
     renderForecast(report);
+    showPuff(moodFor(report), puffLine(report));
   } catch (err) {
     fail(err);
     return;
   }
+  todayReport = report;
+  setStage('ready');
   announce(
     report.now
       ? `Air quality for ${formatPlace(place)}: AQI ${report.now.aqi}, ${CATEGORY_LABEL[report.now.category]}.`
@@ -260,12 +341,20 @@ async function showPlace(place: Place): Promise<void> {
 }
 
 /**
- * Starts the app: mounts the location search and the method notes, then — if a place was
- * saved — loads its air report, renders the AQI card, the forecast and the plan, in that order.
+ * Starts the app: the router, Puff, the location search and the method notes, then — if a place
+ * was saved — loads its air report, renders the AQI card, the forecast and the plan, in that order.
  */
 export async function boot(deps: BootDeps = {}): Promise<void> {
   api = { ...realApi, ...deps.api };
   planCache.clear();
+  currentPlace = null;
+  todayReport = null;
+  router?.stop();
+  router = startRouter({ placeName: () => currentPlace?.name ?? null });
+  showPuff('wave', WELCOME_LINE);
+  setStage('no-place');
+  byId('place-pill').onclick = openSearch;
+  byId('change-place').onclick = toggleSearch;
   renderMethod(byId('method-body'));
   byId('edit-profile').onclick = editProfile;
   askPanel = mountAskPanel(
@@ -278,6 +367,8 @@ export async function boot(deps: BootDeps = {}): Promise<void> {
     (place) => {
       savePlace(place);
       void showPlace(place);
+      // The search folds away once a place is picked, so focus moves to the air it brings.
+      byId('now-title').focus();
     },
     { search: api.searchPlaces, geolocate: deps.geolocate },
   );

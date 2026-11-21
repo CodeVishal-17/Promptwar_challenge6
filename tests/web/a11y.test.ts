@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import axe from 'axe-core';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AirReport, AqiReading, Place } from '../../shared/types.js';
 import { boot } from '../../web/src/main.js';
+import { ROUTES, type Route } from '../../web/src/router.js';
 import { markOnboardingSeen, savePlace } from '../../web/src/store.js';
 import html from '../../web/index.html?raw';
 import { PLACE, makePlan, makeReport } from './helpers.js';
@@ -90,12 +91,39 @@ beforeEach(() => {
   document.title = 'Clearday';
   loadShell();
 });
+afterEach(() => history.replaceState(null, '', location.pathname));
+
+// jsdom has no layout; the router scrolls to the top on navigation.
+vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+
+/** Shows one screen through the router, as following a nav link would. */
+function visit(route: Route): void {
+  location.hash = `#/${route}`;
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
+}
 
 // axe walks the whole page several times per test; jsdom makes that slow on modest machines.
 describe('accessibility (axe-core, WCAG 2.2 A and AA)', { timeout: 30_000 }, () => {
-  it('has no violations on first load, before a place is chosen', async () => {
+  it.each(ROUTES)('has no violations on %s before a place is chosen', async (route) => {
     markOnboardingSeen();
     await boot({ api });
+    visit(route);
+    expect(await violations()).toEqual([]);
+  });
+
+  it.each(ROUTES)('has no violations on %s with a place loaded', async (route) => {
+    markOnboardingSeen();
+    savePlace(PLACE);
+    await boot({ api });
+    visit(route);
+    expect(await violations()).toEqual([]);
+  });
+
+  it('has no violations on Today with the search reopened', async () => {
+    markOnboardingSeen();
+    savePlace(PLACE);
+    await boot({ api });
+    click('#change-place');
     expect(await violations()).toEqual([]);
   });
 

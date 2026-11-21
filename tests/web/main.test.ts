@@ -55,15 +55,39 @@ beforeEach(() => {
 });
 afterEach(() => {
   document.title = '';
+  history.replaceState(null, '', location.pathname);
 });
+
+// jsdom has no layout; the router scrolls to the top on navigation.
+vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+
+function go(hash: string): void {
+  location.hash = hash;
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
+}
+
+const visibleScreens = (): string[] =>
+  [...document.querySelectorAll<HTMLElement>('.screen')].filter((s) => !s.hidden).map((s) => s.id);
+const emptyTitle = (id: string): string | null | undefined =>
+  document.querySelector(`#${id}:not([hidden]) .screen-empty__title`)?.textContent;
 
 describe('boot', () => {
   it('without a saved place, shows the welcome state and fetches nothing', async () => {
     await boot(deps());
     expect(getAir).not.toHaveBeenCalled();
     expect(getPlan).not.toHaveBeenCalled();
-    expect(nowBody().textContent).toMatch(/Search for your city/);
+    expect(document.querySelector('#today-puff svg')?.getAttribute('data-mood')).toBe('wave');
+    expect(document.querySelector('#today-puff .puff-says__bubble')?.textContent).toMatch(
+      /Hi, I'm Puff!/,
+    );
+    expect(section('now').hidden).toBe(true);
+    expect(section('search-panel').hidden).toBe(false);
     expect(document.querySelector('[role="combobox"]')).not.toBeNull();
+    for (const id of ['forecast-empty', 'plan-empty', 'ask-empty']) {
+      expect(emptyTitle(id), id).toBe('Pick a place first');
+    }
+    expect(visibleScreens()).toEqual(['screen-today']);
+    expect(document.title).toBe('Today — Clearday');
   });
 
   it('reveals the forecast section and draws the chart once the air arrives', async () => {
@@ -82,7 +106,7 @@ describe('boot', () => {
     expect(nowBody().querySelector('.aqi-number')?.textContent).toBe('162');
     expect(nowBody().hasAttribute('aria-busy')).toBe(false);
     expect(statusText()).toBe('Air quality for São Paulo, Brazil: AQI 162, Unhealthy.');
-    expect(document.title).toBe('São Paulo — Clearday');
+    expect(document.title).toBe('Today · São Paulo — Clearday');
   });
 
   it('shows an error with Retry when the air request fails, and Retry tries again', async () => {
@@ -425,5 +449,123 @@ describe('ask panel', () => {
     resolveAsk({ answer: 'Old place answer.', aiUsed: true });
     await flush();
     expect(document.querySelector('#ask-body .ask__answer')?.textContent).toBe('');
+  });
+});
+
+describe('app shell', () => {
+  it('opens a deep link before any place on its empty state', async () => {
+    location.hash = '#/plan';
+    await boot(deps());
+    expect(visibleScreens()).toEqual(['screen-plan']);
+    expect(emptyTitle('plan-empty')).toBe('Pick a place first');
+    expect(document.querySelector('#plan-empty a')?.getAttribute('href')).toBe('#/today');
+    expect(document.title).toBe('My plan — Clearday');
+  });
+
+  it('shows Puff in the air’s mood with his line, and hides the empty states', async () => {
+    savePlace(PLACE);
+    await boot(deps());
+    expect(document.querySelector('#today-puff svg')?.getAttribute('data-mood')).toBe('unhealthy');
+    expect(document.querySelector('#today-puff .puff-says__bubble')?.textContent).toContain(
+      'Rough air today, so keep outdoor effort light.',
+    );
+    for (const id of ['forecast-empty', 'plan-empty', 'ask-empty']) {
+      expect(section(id).hidden, id).toBe(true);
+    }
+  });
+
+  it('collapses the search once a place is chosen, and names it in the header', async () => {
+    savePlace(PLACE);
+    await boot(deps());
+    expect(section('search-panel').hidden).toBe(true);
+    expect(section('place-pill').hidden).toBe(false);
+    expect(section('place-pill-name').textContent).toBe('São Paulo');
+    expect(section('change-place').hidden).toBe(false);
+    expect(section('now').hidden).toBe(false);
+  });
+
+  it('marks the plan card busy on Today while the plan loads, then fills it in', async () => {
+    savePlace(PLACE);
+    let resolve: (p: Plan) => void = () => {};
+    getPlan.mockImplementationOnce(() => new Promise((r) => (resolve = r)));
+    const pending = boot(deps());
+    await flush();
+    await flush();
+    expect(section('highlights').hidden).toBe(false);
+    expect(document.querySelector('.highlight--plan')?.getAttribute('aria-busy')).toBe('true');
+    resolve(makePlan());
+    await pending;
+    expect(document.querySelector('.highlight--plan .highlight__value')?.textContent).toBe(
+      '3 steps for today',
+    );
+    expect(document.querySelector('.highlight--indoor')).not.toBeNull();
+  });
+
+  it('says the plan is unavailable on Today when it fails', async () => {
+    savePlace(PLACE);
+    getPlan.mockRejectedValueOnce(new ApiError('network', 0));
+    await boot(deps());
+    expect(document.querySelector('.highlight--plan .highlight__value')?.textContent).toBe(
+      'Open your plan',
+    );
+  });
+
+  it('the place pill opens the search on Today from any screen, and a pick closes it', async () => {
+    savePlace(PLACE);
+    await boot(deps());
+    go('#/forecast');
+    section('place-pill').click();
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    expect(location.hash).toBe('#/today');
+    expect(visibleScreens()).toEqual(['screen-today']);
+    expect(section('search-panel').hidden).toBe(false);
+    expect(section('place-pill').getAttribute('aria-expanded')).toBe('true');
+    expect(section('change-place').getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement).toBe(document.querySelector('#location-search input'));
+
+    searchPlaces.mockResolvedValueOnce([{ ...PLACE, name: 'Lima', countryCode: 'PE' }]);
+    await pickFromSearch();
+    await flush();
+    expect(section('search-panel').hidden).toBe(true);
+    expect(section('change-place').getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement?.id).toBe('now-title');
+    expect(section('place-pill-name').textContent).toBe('Lima');
+  });
+
+  it('Change place toggles the search open and closed', async () => {
+    savePlace(PLACE);
+    await boot(deps());
+    section('change-place').click();
+    expect(section('search-panel').hidden).toBe(false);
+    section('change-place').click();
+    expect(section('search-panel').hidden).toBe(true);
+    expect(section('change-place').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('shows “checking” on the other screens while a place loads', async () => {
+    getAir.mockImplementationOnce(() => new Promise(() => {}));
+    savePlace(PLACE);
+    void boot(deps());
+    await flush();
+    expect(emptyTitle('forecast-empty')).toBe('Checking the air…');
+    expect(section('highlights').hidden).toBe(true);
+  });
+
+  it('when the air fails, the other screens point back to Today', async () => {
+    savePlace(PLACE);
+    getAir.mockRejectedValueOnce(new ApiError('air_data_unavailable', 502));
+    await boot(deps());
+    for (const id of ['forecast-empty', 'plan-empty', 'ask-empty']) {
+      expect(emptyTitle(id), id).toBe("We couldn't load the air");
+    }
+    expect(section('highlights').hidden).toBe(true);
+  });
+
+  it('titles the page with the screen and the place on navigation', async () => {
+    savePlace(PLACE);
+    await boot(deps());
+    go('#/ask');
+    expect(document.title).toBe('Ask · São Paulo — Clearday');
+    expect(document.activeElement?.id).toBe('ask-title');
   });
 });

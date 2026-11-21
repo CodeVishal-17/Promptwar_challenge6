@@ -117,6 +117,25 @@ describe('startRouter', () => {
     expect(visible()).toEqual(['today']);
   });
 
+  it('go switches screens at once and updates the address, focusing only when asked', () => {
+    router = startRouter({ placeName: () => place });
+    router.go('forecast', false);
+    expect(location.hash).toBe('#/forecast');
+    expect(visible()).toEqual(['forecast']);
+    expect(document.activeElement).toBe(document.body);
+    router.go('plan');
+    expect(document.activeElement).toBe(screen('plan').querySelector('h1'));
+  });
+
+  it('ignores the hashchange that follows go, so focus stays where the caller put it', () => {
+    router = startRouter({ placeName: () => place });
+    const input = document.body.appendChild(h('input', {}));
+    router.go('ask', false);
+    input.focus();
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    expect(document.activeElement).toBe(input);
+  });
+
   it('stop removes the listener', () => {
     router = startRouter({ placeName: () => place });
     router.stop();
