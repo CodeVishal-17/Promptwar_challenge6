@@ -55,6 +55,23 @@ describe('renderAqiCard', () => {
     expect(el.textContent).not.toMatch(/\b0\b/);
   });
 
+  it('folds the scale and the main pollutant into a closed "More details"', () => {
+    renderAqiCard(el, makeReport(), PLACE);
+    const more = el.querySelector<HTMLDetailsElement>('details.aqi-card__more');
+    expect(more?.open).toBe(false);
+    expect(more?.querySelector('summary')?.textContent).toBe('More details');
+    expect(more?.querySelector('.aqi-scale')).not.toBeNull();
+    expect(more?.textContent).toContain('Main pollutant');
+    expect(more?.querySelector('.aqi-card__source')).toBeNull();
+    expect(el.querySelector('.aqi-card__source')).not.toBeNull();
+    expect(more?.querySelector('.aqi-number')).toBeNull();
+  });
+
+  it('has no "More details" without a reading', () => {
+    renderAqiCard(el, makeReport({ now: null }), PLACE);
+    expect(el.querySelector('.aqi-card__more')).toBeNull();
+  });
+
   it('replaces whatever was there before', () => {
     renderAqiCard(el, makeReport(), PLACE);
     renderAqiCard(el, makeReport(), PLACE);

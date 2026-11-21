@@ -95,15 +95,21 @@ function reading(now: AqiReading): HTMLElement[] {
         h('span', { class: 'aqi-card__label' }, CATEGORY_LABEL[now.category]),
       ),
     ),
-    scale(now),
+    // Closed by default, so the big number and Today's cards sit together.
     h(
-      'dl',
-      { class: 'aqi-card__facts' },
+      'details',
+      { class: 'aqi-card__more' },
+      h('summary', {}, 'More details'),
+      scale(now),
       h(
-        'div',
-        { class: 'aqi-card__fact' },
-        h('dt', {}, 'Main pollutant'),
-        h('dd', {}, POLLUTANT_LABEL[now.dominant]),
+        'dl',
+        { class: 'aqi-card__facts' },
+        h(
+          'div',
+          { class: 'aqi-card__fact' },
+          h('dt', {}, 'Main pollutant'),
+          h('dd', {}, POLLUTANT_LABEL[now.dominant]),
+        ),
       ),
     ),
   ];
