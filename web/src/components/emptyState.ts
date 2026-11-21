@@ -31,10 +31,11 @@ const COPY: Record<Stage, { title: string; text: string; mood: Mood; link: boole
  */
 export function renderEmptyState(el: HTMLElement, stage: Stage): void {
   const copy = COPY[stage];
-  el.replaceChildren(
+  const parts: Node[] = [
     puff(copy.mood, 'sm'),
     h('p', { class: 'screen-empty__title' }, copy.title),
     h('p', { class: 'screen-empty__text' }, copy.text),
-    copy.link ? h('a', { class: 'btn btn--primary', href: '#/today' }, 'Go to Today') : null,
-  );
+  ];
+  if (copy.link) parts.push(h('a', { class: 'btn btn--primary', href: '#/today' }, 'Go to Today'));
+  el.replaceChildren(...parts);
 }
