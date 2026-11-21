@@ -1,46 +1,21 @@
 import type { Place } from '../../../shared/types.js';
 import { ApiError, searchPlaces } from '../api.js';
-import { announce, h, srOnly } from '../dom.js';
+import { announce, h } from '../dom.js';
 import { formatPlace } from '../format.js';
 import { icon } from '../icons.js';
+import { type Coords, browserGeolocate, locateButton } from './locateButton.js';
+import { PlaceList } from './placeList.js';
+
+export { browserGeolocate } from './locateButton.js';
 
 const DEBOUNCE_MS = 300;
 const MIN_QUERY = 2;
 const MAX_QUERY = 80;
-const LOCATE_LABEL = 'Use my location';
-const GEO_FAILED = "Couldn't get your location — search for your city instead.";
-/** Keyed by GeolocationPositionError.code, so each failure says how to fix it. */
-const GEO_MESSAGES: Record<number, string> = {
-  1: "Location access is blocked for this site. Allow it in your browser's site settings, or search for your city.",
-  2: "Your device couldn't work out where you are. Check that location is turned on, or search for your city.",
-  3: 'Finding your location took too long. Try again, or search for your city.',
-};
-
-/** The message for a failed geolocation: specific for the browser's error codes, general otherwise. */
-function geoErrorMessage(err: unknown): string {
-  const code = (err as { code?: unknown } | null | undefined)?.code;
-  return (typeof code === 'number' && GEO_MESSAGES[code]) || GEO_FAILED;
-}
 const NO_RESULTS = 'No places found. Check the spelling, or try a nearby larger city.';
 
 interface Deps {
   search?: typeof searchPlaces;
-  geolocate?: () => Promise<{ lat: number; lon: number }>;
-}
-
-/** The browser's position, coarse and possibly cached for 10 min: city-level air needs no more. */
-export function browserGeolocate(): Promise<{ lat: number; lon: number }> {
-  return new Promise((resolve, reject) => {
-    if (!('geolocation' in navigator)) {
-      reject(new Error('Geolocation unsupported'));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-      reject,
-      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 600_000 },
-    );
-  });
+  geolocate?: () => Promise<Coords>;
 }
 
 function searchErrorMessage(err: unknown): string {
@@ -52,22 +27,18 @@ function searchErrorMessage(err: unknown): string {
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
-let instances = 0;
+/** A place for the browser's own position. A reverse lookup would be another request, so the
+ * country is unknown and grid figures use the world average (an empty code counts as absent). */
+const currentLocation = ({ lat, lon }: Coords): Place => ({
+  name: 'Current location',
+  country: '',
+  countryCode: '',
+  lat: round2(lat),
+  lon: round2(lon),
+});
 
-/**
- * A city search following the ARIA 1.2 combobox pattern (editable input + listbox popup):
- * focus stays in the input while arrow keys move `aria-activedescendant` through the options,
- * Enter or a click picks, Escape and Tab close. Plus a "Use my location" button.
- */
-export function mountLocationSearch(
-  el: HTMLElement,
-  onPick: (p: Place) => void,
-  deps: Deps = {},
-): void {
-  const search = deps.search ?? searchPlaces;
-  const geolocate = deps.geolocate ?? browserGeolocate;
-  const id = `place-search-${++instances}`;
-
+/** The input, its listbox popup and the message line, wired with ARIA ids under `id`. */
+function searchElements(id: string) {
   const message = h('p', { id: `${id}-message`, class: 'location-search__message' });
   const listbox = h('ul', {
     id: `${id}-listbox`,
@@ -100,200 +71,180 @@ export function mountLocationSearch(
     h('span', { class: 'combobox__spinner', 'aria-hidden': 'true' }),
     listbox,
   );
-  const locateText = h('span', {}, LOCATE_LABEL);
-  const locate = h(
-    'button',
-    { type: 'button', class: 'btn btn--secondary locate-button' },
-    icon('locate'),
-    locateText,
-  );
+  return { message, listbox, input, combobox };
+}
 
-  let results: Place[] = [];
-  let active = -1;
+/**
+ * Debounced, cancellable place search. A newer query, or `cancel()`, drops any pending or
+ * in-flight one, so a late answer can never overwrite a newer one or reopen the list.
+ */
+function searchRunner(
+  search: typeof searchPlaces,
+  busyEl: HTMLElement,
+  on: { results(places: Place[]): void; error(err: unknown): void },
+) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let inFlight: AbortController | null = null;
-  let locating = false;
 
-  const options = (): HTMLElement[] => [...listbox.children] as HTMLElement[];
-  const isOpen = (): boolean => input.getAttribute('aria-expanded') === 'true';
-
-  function setMessage(text: string, tone: 'info' | 'error' = 'info'): void {
-    message.textContent = text;
-    message.dataset.tone = tone;
-  }
-
-  function setActive(index: number): void {
-    options()[active]?.setAttribute('aria-selected', 'false');
-    active = index;
-    const option = options()[index];
-    if (!option) {
-      input.removeAttribute('aria-activedescendant');
-      return;
-    }
-    option.setAttribute('aria-selected', 'true');
-    input.setAttribute('aria-activedescendant', option.id);
-    option.scrollIntoView?.({ block: 'nearest' });
-  }
-
-  function open(): void {
-    if (results.length === 0) return;
-    listbox.hidden = false;
-    input.setAttribute('aria-expanded', 'true');
-  }
-
-  function close(): void {
-    setActive(-1);
-    listbox.hidden = true;
-    input.setAttribute('aria-expanded', 'false');
-  }
-
-  /** Drops any pending or in-flight search, so a late answer cannot reopen the list. */
-  function cancelSearch(): void {
-    clearTimeout(timer);
-    inFlight?.abort();
+  const settle = (controller: AbortController): void => {
+    if (inFlight !== controller) return;
     inFlight = null;
-    delete combobox.dataset.busy;
-  }
+    delete busyEl.dataset.busy;
+  };
 
-  function pick(place: Place): void {
-    cancelSearch();
-    results = [];
-    listbox.replaceChildren();
-    close();
-    input.value = formatPlace(place);
-    setMessage('');
-    onPick(place);
-  }
-
-  function option(place: Place, index: number): HTMLLIElement {
-    const meta = [place.admin1, place.country].filter(Boolean).join(', ');
-    return h(
-      'li',
-      {
-        id: `${id}-option-${index}`,
-        class: 'listbox__option',
-        role: 'option',
-        'aria-selected': 'false',
-        onclick: () => pick(place),
-      },
-      h('span', { class: 'listbox__name' }, place.name),
-      meta ? srOnly(', ') : null,
-      meta ? h('span', { class: 'listbox__meta' }, meta) : null,
-    );
-  }
-
-  function show(places: Place[]): void {
-    results = places;
-    active = -1;
-    listbox.replaceChildren(...places.map(option));
-    if (places.length === 0) {
-      close();
-      setMessage(NO_RESULTS);
-      announce(NO_RESULTS);
-      return;
-    }
-    setMessage('');
-    // Results that land after the user has moved on fill the list but do not pop it open.
-    if (document.activeElement === input) open();
-    const noun = places.length === 1 ? 'place' : 'places';
-    announce(`${places.length} ${noun} found. Use the up and down arrow keys to choose.`);
-  }
-
-  async function run(query: string): Promise<void> {
+  const run = async (query: string): Promise<void> => {
     const controller = new AbortController();
     inFlight = controller;
-    combobox.dataset.busy = 'true';
+    busyEl.dataset.busy = 'true';
     try {
       const places = await search(query, controller.signal);
-      if (inFlight === controller) show(places);
+      if (inFlight === controller) on.results(places);
     } catch (err) {
-      if (controller.signal.aborted) return;
-      const text = searchErrorMessage(err);
-      setMessage(text, 'error');
-      announce(text);
+      if (!controller.signal.aborted) on.error(err);
     } finally {
-      if (inFlight === controller) {
-        inFlight = null;
-        delete combobox.dataset.busy;
-      }
+      settle(controller);
     }
-  }
+  };
 
-  input.addEventListener('input', () => {
-    cancelSearch();
-    const query = input.value.trim();
-    if (query.length < MIN_QUERY) {
-      results = [];
-      listbox.replaceChildren();
-      close();
+  return {
+    cancel(): void {
+      clearTimeout(timer);
+      inFlight?.abort();
+      inFlight = null;
+      delete busyEl.dataset.busy;
+    },
+    schedule(query: string): void {
+      timer = setTimeout(() => void run(query), DEBOUNCE_MS);
+    },
+  };
+}
+
+const ARROW_STEP: Partial<Record<string, 1 | -1>> = { ArrowDown: 1, ArrowUp: -1 };
+
+/** Arrow keys move through the options, Enter picks, Escape closes, Tab closes and moves on. */
+function onComboboxKey(event: KeyboardEvent, list: PlaceList, pick: (p: Place) => void): void {
+  const step = ARROW_STEP[event.key];
+  if (step !== undefined) {
+    if (list.count === 0) return;
+    event.preventDefault();
+    list.move(step);
+    return;
+  }
+  const place = list.highlighted();
+  if (event.key === 'Enter' && place) {
+    event.preventDefault();
+    pick(place);
+  } else if (event.key === 'Escape' && list.isOpen()) {
+    event.preventDefault();
+    list.close();
+  } else if (event.key === 'Tab') {
+    list.close();
+  }
+}
+
+/** The message line under the search: `show` writes it silently, `say` also announces it. */
+function messageLine(message: HTMLElement) {
+  const show = (text: string, tone: 'info' | 'error' = 'info'): void => {
+    message.textContent = text;
+    message.dataset.tone = tone;
+  };
+  const say = (text: string, tone: 'info' | 'error' = 'info'): void => {
+    show(text, tone);
+    announce(text);
+  };
+  return { show, say };
+}
+
+/** Fills the list with search results, opening it only if the input still has focus. */
+function resultsHandler(
+  list: PlaceList,
+  input: HTMLInputElement,
+  line: ReturnType<typeof messageLine>,
+) {
+  return (places: Place[]): void => {
+    list.fill(places);
+    if (places.length === 0) {
+      list.close();
+      line.say(NO_RESULTS);
       return;
     }
-    timer = setTimeout(() => void run(query), DEBOUNCE_MS);
-  });
+    line.show('');
+    // Results that land after the user has moved on fill the list but do not pop it open.
+    if (document.activeElement === input) list.open();
+    const noun = places.length === 1 ? 'place' : 'places';
+    announce(`${String(places.length)} ${noun} found. Use the up and down arrow keys to choose.`);
+  };
+}
 
+type Runner = ReturnType<typeof searchRunner>;
+
+/** Typing searches (after MIN_QUERY characters), keys drive the list, blur closes it. */
+function wireInput(
+  input: HTMLInputElement,
+  list: PlaceList,
+  runner: Runner,
+  pick: (p: Place) => void,
+) {
+  input.addEventListener('input', () => {
+    runner.cancel();
+    const query = input.value.trim();
+    if (query.length < MIN_QUERY) list.clear();
+    else runner.schedule(query);
+  });
   input.addEventListener('keydown', (event) => {
-    const count = results.length;
-    switch (event.key) {
-      case 'ArrowDown':
-      case 'ArrowUp': {
-        if (count === 0) return;
-        event.preventDefault();
-        open();
-        const step = event.key === 'ArrowDown' ? 1 : -1;
-        const from = active === -1 && step === -1 ? 0 : active;
-        setActive((from + step + count) % count);
-        return;
-      }
-      case 'Enter': {
-        const place = results[active];
-        if (isOpen() && place) {
-          event.preventDefault();
-          pick(place);
-        }
-        return;
-      }
-      case 'Escape':
-        if (isOpen()) {
-          event.preventDefault();
-          close();
-        }
-        return;
-      case 'Tab':
-        close();
-        return;
-    }
+    onComboboxKey(event, list, pick);
+  });
+  input.addEventListener('blur', () => {
+    list.close();
+  });
+}
+
+let instances = 0;
+
+/**
+ * A city search following the ARIA 1.2 combobox pattern (editable input + listbox popup):
+ * focus stays in the input while arrow keys move `aria-activedescendant` through the options,
+ * Enter or a click picks, Escape and Tab close. Plus a "Use my location" button.
+ */
+export function mountLocationSearch(
+  el: HTMLElement,
+  onPick: (p: Place) => void,
+  deps: Deps = {},
+): void {
+  const id = `place-search-${String(++instances)}`;
+  const { message, listbox, input, combobox } = searchElements(id);
+  const line = messageLine(message);
+
+  const pick = (place: Place): void => {
+    runner.cancel();
+    list.clear();
+    input.value = formatPlace(place);
+    line.show('');
+    onPick(place);
+  };
+  const list = new PlaceList(id, input, listbox, pick);
+  const runner = searchRunner(deps.search ?? searchPlaces, combobox, {
+    results: resultsHandler(list, input, line),
+    error: (err) => {
+      line.say(searchErrorMessage(err), 'error');
+    },
+  });
+  wireInput(input, list, runner, pick);
+  // Keep focus in the input while an option is pressed, so the click lands before blur closes.
+  listbox.addEventListener('mousedown', (event) => {
+    event.preventDefault();
   });
 
-  input.addEventListener('blur', close);
-  // Keep focus in the input while an option is pressed, so the click lands before blur closes.
-  listbox.addEventListener('mousedown', (event) => event.preventDefault());
-
-  locate.addEventListener('click', async () => {
-    if (locating) return;
-    locating = true;
-    locate.setAttribute('aria-disabled', 'true');
-    locateText.textContent = 'Locating…';
-    setMessage('');
-    try {
-      const { lat, lon } = await geolocate();
-      // A reverse lookup would be another request; the country is unknown, so grid figures
-      // use the world average (the server treats an empty country code as absent).
-      pick({
-        name: 'Current location',
-        country: '',
-        countryCode: '',
-        lat: round2(lat),
-        lon: round2(lon),
-      });
-    } catch (err) {
-      const text = geoErrorMessage(err);
-      setMessage(text, 'error');
-      announce(text);
-    } finally {
-      locating = false;
-      locate.removeAttribute('aria-disabled');
-      locateText.textContent = LOCATE_LABEL;
-    }
+  const locate = locateButton(deps.geolocate ?? browserGeolocate, {
+    onStart: () => {
+      line.show('');
+    },
+    onFound: (coords) => {
+      pick(currentLocation(coords));
+    },
+    onError: (text) => {
+      line.say(text, 'error');
+    },
   });
 
   el.replaceChildren(
